@@ -15,18 +15,11 @@ export type WeeklyFastSubject = {
   label: string;
 };
 
-export type FastKind = "team" | "personal";
-
 export type FastEntry = {
   id: string;
   device_id: string;
   user_name: string | null;
-  kind: FastKind;
-  weekly_fast_id: string | null;
-  title: string | null;
-  fast_date: string | null;
-  in_team_fast: boolean;
-  global_hours: number | null;
+  weekly_fast_id: string;
   created_at: string;
   updated_at: string;
 };
@@ -34,9 +27,18 @@ export type FastEntry = {
 export type FastEntrySubject = {
   id: string;
   fast_entry_id: string;
-  weekly_fast_subject_id: string | null;
-  custom_label: string | null;
+  weekly_fast_subject_id: string;
   intercessions: number;
-  hours: number;
-  position: number;
+  prayer_minutes: number;
+};
+
+export type SubjectValues = {
+  intercessions: number;
+  prayerMinutes: number;
+};
+
+export type WeekData = {
+  weeklyFast: WeeklyFast;
+  subjects: WeeklyFastSubject[];
+  values: Record<string, SubjectValues>;
 };

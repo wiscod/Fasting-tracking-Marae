@@ -2,6 +2,7 @@ import { getSupabase } from "./supabase";
 import type {
   FastEntry,
   FastEntrySubject,
+  SubjectValues,
   WeeklyFast,
   WeeklyFastSubject,
 } from "./types";
@@ -22,7 +23,7 @@ export async function getOrCreateWeeklyFast(
 
   const created = await sb
     .from("weekly_fasts")
-    .insert({ year, week, title: `Jeûne d'équipe — Sem ${week}` })
+    .insert({ year, week, title: `Sem ${week}` })
     .select("*")
     .single();
   if (created.error) throw created.error;
@@ -42,217 +43,166 @@ export async function getWeeklyFastSubjects(
   return (data ?? []) as WeeklyFastSubject[];
 }
 
-export async function getTeamFastEntry(
+export async function getOrCreateEntry(
   deviceId: string,
   weeklyFastId: string,
-): Promise<{ entry: FastEntry | null; subjects: FastEntrySubject[] }> {
+  userName: string | null,
+): Promise<FastEntry> {
   const sb = getSupabase();
-  const { data: entry, error } = await sb
+  const existing = await sb
     .from("fast_entries")
     .select("*")
     .eq("device_id", deviceId)
     .eq("weekly_fast_id", weeklyFastId)
-    .eq("kind", "team")
     .maybeSingle();
-  if (error) throw error;
-  if (!entry) return { entry: null, subjects: [] };
+  if (existing.error) throw existing.error;
+  if (existing.data) return existing.data as FastEntry;
 
-  const { data: subs, error: subErr } = await sb
-    .from("fast_entry_subjects")
+  const created = await sb
+    .from("fast_entries")
+    .insert({
+      device_id: deviceId,
+      user_name: userName,
+      weekly_fast_id: weeklyFastId,
+    })
     .select("*")
-    .eq("fast_entry_id", entry.id)
-    .order("position", { ascending: true });
-  if (subErr) throw subErr;
-  return {
-    entry: entry as FastEntry,
-    subjects: (subs ?? []) as FastEntrySubject[],
-  };
+    .single();
+  if (created.error) throw created.error;
+  return created.data as FastEntry;
 }
 
-export type SubjectInput = {
-  weekly_fast_subject_id: string | null;
-  custom_label: string | null;
-  intercessions: number;
-  hours: number;
-  position: number;
-};
-
-export async function saveTeamFastEntry(args: {
-  deviceId: string;
-  userName: string | null;
-  weeklyFastId: string;
-  globalHours: number | null;
-  subjects: SubjectInput[];
-}): Promise<FastEntry> {
+export async function getEntrySubjects(
+  fastEntryId: string,
+): Promise<FastEntrySubject[]> {
   const sb = getSupabase();
+  const { data, error } = await sb
+    .from("fast_entry_subjects")
+    .select("*")
+    .eq("fast_entry_id", fastEntryId);
+  if (error) throw error;
+  return (data ?? []) as FastEntrySubject[];
+}
 
-  let entryId: string;
+export async function upsertSubjectValue(
+  fastEntryId: string,
+  weeklyFastSubjectId: string,
+  field: "intercessions" | "prayer_minutes",
+  value: number,
+): Promise<void> {
+  const sb = getSupabase();
   const existing = await sb
-    .from("fast_entries")
-    .select("id")
-    .eq("device_id", args.deviceId)
-    .eq("weekly_fast_id", args.weeklyFastId)
-    .eq("kind", "team")
+    .from("fast_entry_subjects")
+    .select("id, intercessions, prayer_minutes")
+    .eq("fast_entry_id", fastEntryId)
+    .eq("weekly_fast_subject_id", weeklyFastSubjectId)
     .maybeSingle();
   if (existing.error) throw existing.error;
 
   if (existing.data) {
-    entryId = existing.data.id;
     const upd = await sb
-      .from("fast_entries")
-      .update({
-        user_name: args.userName,
-        global_hours: args.globalHours,
-      })
-      .eq("id", entryId);
+      .from("fast_entry_subjects")
+      .update({ [field]: value })
+      .eq("id", existing.data.id);
     if (upd.error) throw upd.error;
-  } else {
-    const ins = await sb
-      .from("fast_entries")
-      .insert({
-        device_id: args.deviceId,
-        user_name: args.userName,
-        kind: "team",
-        weekly_fast_id: args.weeklyFastId,
-        in_team_fast: true,
-        global_hours: args.globalHours,
-      })
-      .select("id")
-      .single();
-    if (ins.error) throw ins.error;
-    entryId = ins.data.id;
+    return;
   }
 
-  const del = await sb
-    .from("fast_entry_subjects")
-    .delete()
-    .eq("fast_entry_id", entryId);
-  if (del.error) throw del.error;
-
-  if (args.subjects.length > 0) {
-    const rows = args.subjects.map((s) => ({ ...s, fast_entry_id: entryId }));
-    const insSubs = await sb.from("fast_entry_subjects").insert(rows);
-    if (insSubs.error) throw insSubs.error;
-  }
-
-  const finalEntry = await sb
-    .from("fast_entries")
-    .select("*")
-    .eq("id", entryId)
-    .single();
-  if (finalEntry.error) throw finalEntry.error;
-  return finalEntry.data as FastEntry;
+  const ins = await sb.from("fast_entry_subjects").insert({
+    fast_entry_id: fastEntryId,
+    weekly_fast_subject_id: weeklyFastSubjectId,
+    intercessions: field === "intercessions" ? value : 0,
+    prayer_minutes: field === "prayer_minutes" ? value : 0,
+  });
+  if (ins.error) throw ins.error;
 }
 
-export async function listPersonalFasts(
-  deviceId: string,
-): Promise<FastEntry[]> {
+export async function updateUserName(
+  fastEntryId: string,
+  userName: string | null,
+): Promise<void> {
   const sb = getSupabase();
-  const { data, error } = await sb
+  const { error } = await sb
     .from("fast_entries")
-    .select("*")
+    .update({ user_name: userName })
+    .eq("id", fastEntryId);
+  if (error) throw error;
+}
+
+export async function listMyEntries(
+  deviceId: string,
+): Promise<{ entry: FastEntry; weeklyFast: WeeklyFast; subjects: FastEntrySubject[] }[]> {
+  const sb = getSupabase();
+  const { data: entries, error } = await sb
+    .from("fast_entries")
+    .select("*, weekly_fast:weekly_fasts(*)")
     .eq("device_id", deviceId)
-    .eq("kind", "personal")
-    .order("fast_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as FastEntry[];
-}
+  if (!entries || entries.length === 0) return [];
 
-export async function getPersonalFast(
-  id: string,
-): Promise<{ entry: FastEntry | null; subjects: FastEntrySubject[] }> {
-  const sb = getSupabase();
-  const { data: entry, error } = await sb
-    .from("fast_entries")
-    .select("*")
-    .eq("id", id)
-    .eq("kind", "personal")
-    .maybeSingle();
-  if (error) throw error;
-  if (!entry) return { entry: null, subjects: [] };
+  const ids = entries.map((e: { id: string }) => e.id);
   const { data: subs, error: subErr } = await sb
     .from("fast_entry_subjects")
     .select("*")
-    .eq("fast_entry_id", entry.id)
-    .order("position", { ascending: true });
+    .in("fast_entry_id", ids);
   if (subErr) throw subErr;
-  return {
-    entry: entry as FastEntry,
-    subjects: (subs ?? []) as FastEntrySubject[],
-  };
+
+  const byEntry = new Map<string, FastEntrySubject[]>();
+  for (const s of (subs ?? []) as FastEntrySubject[]) {
+    const arr = byEntry.get(s.fast_entry_id) ?? [];
+    arr.push(s);
+    byEntry.set(s.fast_entry_id, arr);
+  }
+
+  return entries.map((e) => {
+    const { weekly_fast, ...entry } = e as FastEntry & {
+      weekly_fast: WeeklyFast;
+    };
+    return {
+      entry: entry as FastEntry,
+      weeklyFast: weekly_fast,
+      subjects: byEntry.get(entry.id) ?? [],
+    };
+  });
 }
 
-export async function savePersonalFast(args: {
-  id?: string;
-  deviceId: string;
-  userName: string | null;
-  title: string;
-  fastDate: string | null;
-  inTeamFast: boolean;
-  weeklyFastId: string | null;
-  globalHours: number | null;
-  subjects: SubjectInput[];
-}): Promise<FastEntry> {
+export type TeamMember = {
+  device_id: string;
+  user_name: string | null;
+  values: Record<string, SubjectValues>;
+};
+
+export async function getTeamForWeek(
+  weeklyFastId: string,
+): Promise<TeamMember[]> {
   const sb = getSupabase();
-  let entryId: string;
-
-  if (args.id) {
-    entryId = args.id;
-    const upd = await sb
-      .from("fast_entries")
-      .update({
-        user_name: args.userName,
-        title: args.title,
-        fast_date: args.fastDate,
-        in_team_fast: args.inTeamFast,
-        weekly_fast_id: args.inTeamFast ? args.weeklyFastId : null,
-        global_hours: args.globalHours,
-      })
-      .eq("id", entryId);
-    if (upd.error) throw upd.error;
-  } else {
-    const ins = await sb
-      .from("fast_entries")
-      .insert({
-        device_id: args.deviceId,
-        user_name: args.userName,
-        kind: "personal",
-        title: args.title,
-        fast_date: args.fastDate,
-        in_team_fast: args.inTeamFast,
-        weekly_fast_id: args.inTeamFast ? args.weeklyFastId : null,
-        global_hours: args.globalHours,
-      })
-      .select("id")
-      .single();
-    if (ins.error) throw ins.error;
-    entryId = ins.data.id;
-  }
-
-  const del = await sb
-    .from("fast_entry_subjects")
-    .delete()
-    .eq("fast_entry_id", entryId);
-  if (del.error) throw del.error;
-
-  if (args.subjects.length > 0) {
-    const rows = args.subjects.map((s) => ({ ...s, fast_entry_id: entryId }));
-    const insSubs = await sb.from("fast_entry_subjects").insert(rows);
-    if (insSubs.error) throw insSubs.error;
-  }
-
-  const finalEntry = await sb
+  const { data: entries, error } = await sb
     .from("fast_entries")
-    .select("*")
-    .eq("id", entryId)
-    .single();
-  if (finalEntry.error) throw finalEntry.error;
-  return finalEntry.data as FastEntry;
-}
-
-export async function deletePersonalFast(id: string): Promise<void> {
-  const sb = getSupabase();
-  const { error } = await sb.from("fast_entries").delete().eq("id", id);
+    .select("id, device_id, user_name")
+    .eq("weekly_fast_id", weeklyFastId);
   if (error) throw error;
+  if (!entries || entries.length === 0) return [];
+
+  const ids = entries.map((e) => e.id);
+  const { data: subs, error: subErr } = await sb
+    .from("fast_entry_subjects")
+    .select("fast_entry_id, weekly_fast_subject_id, intercessions, prayer_minutes")
+    .in("fast_entry_id", ids);
+  if (subErr) throw subErr;
+
+  const byEntry = new Map<string, Record<string, SubjectValues>>();
+  for (const s of (subs ?? []) as FastEntrySubject[]) {
+    const map = byEntry.get(s.fast_entry_id) ?? {};
+    map[s.weekly_fast_subject_id] = {
+      intercessions: s.intercessions,
+      prayerMinutes: s.prayer_minutes,
+    };
+    byEntry.set(s.fast_entry_id, map);
+  }
+
+  return entries.map((e) => ({
+    device_id: e.device_id as string,
+    user_name: (e.user_name as string | null) ?? null,
+    values: byEntry.get(e.id as string) ?? {},
+  }));
 }
