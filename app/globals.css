@@ -4,30 +4,46 @@
 
 html,
 body {
+  margin: 0;
+  padding: 0;
   height: 100%;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  background: oklch(0.93 0.008 70);
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: oklch(0.22 0.015 60);
+  overscroll-behavior: none;
 }
 
-@layer components {
-  .btn {
-    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition;
-  }
-  .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50;
-  }
-  .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100;
-  }
-  .input {
-    @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
-  }
-  .card {
-    @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm;
-  }
-  .label {
-    @apply block text-sm font-medium text-slate-700;
-  }
+body.dark {
+  background: oklch(0.12 0.012 60);
+  color: oklch(0.94 0.01 80);
 }
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1200px 800px at 80% -10%, color-mix(in oklch, oklch(0.66 0.13 55) 7%, transparent), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, color-mix(in oklch, oklch(0.66 0.13 55) 4%, transparent), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.6); }
+}
+
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
