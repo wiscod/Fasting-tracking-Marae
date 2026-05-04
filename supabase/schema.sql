@@ -1,11 +1,11 @@
--- Schema Supabase pour l'app Jeûnes
--- À exécuter dans le SQL editor de Supabase.
--- NOTE: pendant la phase de tests il n'y a pas d'auth, donc les policies sont
--- volontairement permissives (anon peut tout lire/écrire). À durcir avant prod.
+-- Schema Supabase v2 pour l'app Jeûnes (modèle 3 sujets de prière par semaine)
+-- À exécuter dans le SQL editor de Supabase pour une installation propre.
+-- Pour une migration depuis v1, utiliser supabase/migration_v2.sql.
+-- NOTE: pas d'auth pendant la phase de tests, RLS volontairement permissif.
 
 create extension if not exists "pgcrypto";
 
--- Jeûnes d'équipe hebdomadaires (configurés par l'admin)
+-- Semaines de prière (configurées par l'admin)
 create table if not exists weekly_fasts (
   id uuid primary key default gen_random_uuid(),
   year int not null,
@@ -17,7 +17,7 @@ create table if not exists weekly_fasts (
   unique (year, week)
 );
 
--- Sujets de prière pré-configurés pour un jeûne d'équipe
+-- 3 sujets de prière par semaine (position 1, 2, 3)
 create table if not exists weekly_fast_subjects (
   id uuid primary key default gen_random_uuid(),
   weekly_fast_id uuid not null references weekly_fasts(id) on delete cascade,
@@ -25,44 +25,34 @@ create table if not exists weekly_fast_subjects (
   label text not null
 );
 
--- Entrée de jeûne d'un utilisateur (équipe ou perso)
+-- Une entrée par device et par semaine
 create table if not exists fast_entries (
   id uuid primary key default gen_random_uuid(),
   device_id text not null,
   user_name text,
-  kind text not null check (kind in ('team', 'personal')),
-  weekly_fast_id uuid references weekly_fasts(id) on delete set null,
-  title text,
-  fast_date date,
-  in_team_fast boolean not null default false,
-  global_hours numeric,
+  weekly_fast_id uuid not null references weekly_fasts(id) on delete cascade,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
-create index if not exists fast_entries_device_idx on fast_entries(device_id);
 create index if not exists fast_entries_weekly_idx on fast_entries(weekly_fast_id);
+create unique index if not exists fast_entries_device_week_unique
+  on fast_entries(device_id, weekly_fast_id);
 
--- Pour un jeûne d'équipe, une seule entrée par device par semaine
-create unique index if not exists fast_entries_team_unique
-  on fast_entries(device_id, weekly_fast_id)
-  where kind = 'team';
-
--- Détail par sujet : intercessions et heures
+-- Détail par sujet : importunités (entier) et minutes de prière (entier)
 create table if not exists fast_entry_subjects (
   id uuid primary key default gen_random_uuid(),
   fast_entry_id uuid not null references fast_entries(id) on delete cascade,
-  weekly_fast_subject_id uuid references weekly_fast_subjects(id) on delete set null,
-  custom_label text,
+  weekly_fast_subject_id uuid not null references weekly_fast_subjects(id) on delete cascade,
   intercessions int not null default 0,
-  hours numeric not null default 0,
-  position int not null default 0
+  prayer_minutes int not null default 0,
+  unique (fast_entry_id, weekly_fast_subject_id)
 );
 
 create index if not exists fast_entry_subjects_entry_idx
   on fast_entry_subjects(fast_entry_id);
 
--- Trigger pour maintenir updated_at
+-- Trigger updated_at
 create or replace function set_updated_at()
 returns trigger as $$
 begin
