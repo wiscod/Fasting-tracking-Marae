@@ -2,7 +2,7 @@
 -- avec 3 sujets de prière. Adapte les valeurs avant exécution.
 
 insert into weekly_fasts (year, week, title)
-values (extract(year from now())::int, 17, 'Jeûne d''équipe — Sem 19')
+values (extract(year from now())::int, 19, 'Jeûne d''équipe — Sem 19')
 on conflict (year, week) do nothing;
 
 with wf as (
