@@ -170,8 +170,11 @@ export function TeamFastClient({
       <div className="card text-sm text-slate-700">
         <p className="font-medium">Pas encore de sujets pour Sem {week}.</p>
         <p className="mt-1 text-slate-500">
-          L'admin doit pré-configurer les 3 sujets de la semaine dans Supabase
-          (table <code>weekly_fast_subjects</code>).
+          L'admin doit configurer les sujets de la semaine via la{" "}
+          <a href="/admin" className="text-brand-600 underline hover:text-brand-700">
+            page admin
+          </a>
+          .
         </p>
       </div>
     );
