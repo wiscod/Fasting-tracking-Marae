@@ -2,12 +2,12 @@
 -- avec 3 sujets de prière. Adapte les valeurs avant exécution.
 
 insert into weekly_fasts (year, week, title)
-values (extract(year from now())::int, 17, 'Jeûne d''équipe — Sem 17')
+values (extract(year from now())::int, 17, 'Jeûne d''équipe — Sem 19')
 on conflict (year, week) do nothing;
 
 with wf as (
   select id from weekly_fasts
-  where year = extract(year from now())::int and week = 17
+  where year = extract(year from now())::int and week = 19
 )
 insert into weekly_fast_subjects (weekly_fast_id, position, label)
 select wf.id, p.position, p.label
