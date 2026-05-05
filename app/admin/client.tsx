@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getOrCreateWeeklyFast, getWeeklyFastSubjects } from "@/lib/data";
 import type { WeeklyFast } from "@/lib/types";
+import { isoWeeksInYear } from "@/lib/week";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 
@@ -55,8 +56,8 @@ export function AdminClient({
     let w = week + delta;
     if (w < 1) {
       y -= 1;
-      w = 52;
-    } else if (w > 53) {
+      w = isoWeeksInYear(y);
+    } else if (w > isoWeeksInYear(y)) {
       y += 1;
       w = 1;
     }
@@ -117,6 +118,7 @@ export function AdminClient({
       <div className="flex items-center justify-between">
         <button
           type="button"
+          aria-label="Semaine précédente"
           onClick={() => navigate(-1)}
           className="btn-secondary"
         >
@@ -133,6 +135,7 @@ export function AdminClient({
         </div>
         <button
           type="button"
+          aria-label="Semaine suivante"
           onClick={() => navigate(1)}
           className="btn-secondary"
         >
@@ -155,6 +158,7 @@ export function AdminClient({
                 className="input"
                 placeholder={`Sujet ${i + 1}`}
                 value={label}
+                maxLength={255}
                 onChange={(e) => updateLabel(i, e.target.value)}
               />
               <button

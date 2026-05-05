@@ -6,10 +6,28 @@ type Payload = {
   subjects: { position: number; label: string }[];
 };
 
+function parsePayload(raw: unknown): Payload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  if (typeof obj.weeklyFastId !== "string" || obj.weeklyFastId === "") return null;
+  if (!Array.isArray(obj.subjects)) return null;
+  const subjects: { position: number; label: string }[] = [];
+  for (const s of obj.subjects) {
+    if (!s || typeof s !== "object") return null;
+    const pos = (s as Record<string, unknown>).position;
+    const label = (s as Record<string, unknown>).label;
+    if (typeof pos !== "number" || !Number.isFinite(pos)) return null;
+    if (typeof label !== "string") return null;
+    subjects.push({ position: pos, label: label.slice(0, 255) });
+  }
+  return { weeklyFastId: obj.weeklyFastId, subjects };
+}
+
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null) as Payload | null;
-  if (!body?.weeklyFastId) {
-    return NextResponse.json({ error: "weeklyFastId requis" }, { status: 400 });
+  const raw = await request.json().catch(() => null);
+  const body = parsePayload(raw);
+  if (!body) {
+    return NextResponse.json({ error: "Payload invalide" }, { status: 400 });
   }
 
   const sb = getSupabase();

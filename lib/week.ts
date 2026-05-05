@@ -12,3 +12,8 @@ export function getIsoWeek(date: Date = new Date()): IsoWeek {
 export function formatWeekLabel(w: IsoWeek): string {
   return `Sem ${w.week}`;
 }
+
+export function isoWeeksInYear(year: number): number {
+  const dec28 = new Date(Date.UTC(year, 11, 28));
+  return getIsoWeek(dec28).week;
+}

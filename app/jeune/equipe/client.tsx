@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { SubjectsEditor, SubjectRow } from "@/components/SubjectsEditor";
+import { isoWeeksInYear } from "@/lib/week";
 import { TotalsBar } from "@/components/TotalsBar";
 import {
   getOrCreateWeeklyFast,
@@ -171,9 +173,9 @@ export function TeamFastClient({
         <p className="font-medium">Pas encore de sujets pour Sem {week}.</p>
         <p className="mt-1 text-slate-500">
           L'admin doit configurer les sujets de la semaine via la{" "}
-          <a href="/admin" className="text-brand-600 underline hover:text-brand-700">
+          <Link href="/admin" className="text-brand-600 underline hover:text-brand-700">
             page admin
-          </a>
+          </Link>
           .
         </p>
       </div>
@@ -185,6 +187,7 @@ export function TeamFastClient({
       <div className="flex items-center justify-between">
         <button
           type="button"
+          aria-label="Semaine précédente"
           onClick={() => navigateWeek(-1, year, week, setYear, setWeek)}
           className="btn-secondary"
         >
@@ -199,6 +202,7 @@ export function TeamFastClient({
         </div>
         <button
           type="button"
+          aria-label="Semaine suivante"
           onClick={() => navigateWeek(1, year, week, setYear, setWeek)}
           className="btn-secondary"
         >
@@ -278,8 +282,8 @@ function navigateWeek(
   let w = week + delta;
   if (w < 1) {
     y -= 1;
-    w = 52;
-  } else if (w > 53) {
+    w = isoWeeksInYear(y);
+  } else if (w > isoWeeksInYear(y)) {
     y += 1;
     w = 1;
   }
