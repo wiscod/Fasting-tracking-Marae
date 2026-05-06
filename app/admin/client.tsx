@@ -2,9 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getOrCreateWeeklyFast, getWeeklyFastSubjects } from "@/lib/data";
-import type { WeeklyFast } from "@/lib/types";
+import {
+  getOrCreateWeeklyFast,
+  getWeeklyFastSubjects,
+  getWeeklyParticipants,
+} from "@/lib/data";
+import type { WeeklyParticipant } from "@/lib/data";
+import type { WeeklyFast, WeeklyFastSubject } from "@/lib/types";
 import { isoWeeksInYear } from "@/lib/week";
+import { WeeklyStats } from "@/components/WeeklyStats";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 
@@ -22,17 +28,27 @@ export function AdminClient({
   const [error, setError] = useState<string | null>(null);
   const [wf, setWf] = useState<WeeklyFast | null>(null);
   const [labels, setLabels] = useState<string[]>(["", "", ""]);
+  const [subjects, setSubjects] = useState<WeeklyFastSubject[]>([]);
+  const [participants, setParticipants] = useState<WeeklyParticipant[]>([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setStatus("loading");
       setError(null);
+      setStatsLoading(true);
       try {
         const weeklyFast = await getOrCreateWeeklyFast(year, week);
-        const subs = await getWeeklyFastSubjects(weeklyFast.id);
+        const [subs, parts] = await Promise.all([
+          getWeeklyFastSubjects(weeklyFast.id),
+          getWeeklyParticipants(weeklyFast.id),
+        ]);
         if (cancelled) return;
         setWf(weeklyFast);
+        setSubjects(subs);
+        setParticipants(parts);
         const initial = Array.from(
           { length: Math.max(3, subs.length) },
           (_, i) => subs[i]?.label ?? "",
@@ -43,13 +59,15 @@ export function AdminClient({
         if (cancelled) return;
         setError(msgOf(e));
         setStatus("error");
+      } finally {
+        if (!cancelled) setStatsLoading(false);
       }
     }
     load();
     return () => {
       cancelled = true;
     };
-  }, [year, week]);
+  }, [year, week, statsRefreshKey]);
 
   function navigate(delta: number) {
     let y = year;
@@ -199,6 +217,29 @@ export function AdminClient({
             ? "✓ Enregistré"
             : "Enregistrer les sujets"}
       </button>
+
+      {/* Dashboard stats */}
+      <section className="flex flex-col gap-3 border-t border-slate-200 pt-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-700">
+            Stats de la semaine
+          </h2>
+          <button
+            type="button"
+            onClick={() => setStatsRefreshKey((k) => k + 1)}
+            disabled={statsLoading}
+            className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:text-slate-400"
+            aria-label="Rafraîchir les stats"
+          >
+            {statsLoading ? "…" : "↻ Rafraîchir"}
+          </button>
+        </div>
+        {statsLoading ? (
+          <p className="text-sm text-slate-500">Chargement…</p>
+        ) : (
+          <WeeklyStats participants={participants} subjects={subjects} />
+        )}
+      </section>
 
       <div className="border-t border-slate-200 pt-2">
         <button

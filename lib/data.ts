@@ -2,6 +2,7 @@ import { getSupabase } from "./supabase";
 import type {
   FastEntry,
   FastEntrySubject,
+  FastKind,
   WeeklyFast,
   WeeklyFastSubject,
 } from "./types";
@@ -255,4 +256,83 @@ export async function deletePersonalFast(id: string): Promise<void> {
   const sb = getSupabase();
   const { error } = await sb.from("fast_entries").delete().eq("id", id);
   if (error) throw error;
+}
+
+export type WeeklyParticipant = {
+  entryId: string;
+  deviceId: string;
+  userName: string | null;
+  kind: FastKind;
+  fastDate: string | null;
+  globalMinutes: number | null;
+  updatedAt: string;
+  totalIntercessions: number;
+  totalMinutes: number;
+  bySubject: {
+    weekly_fast_subject_id: string | null;
+    custom_label: string | null;
+    intercessions: number;
+    minutes: number;
+  }[];
+};
+
+export async function getWeeklyParticipants(
+  weeklyFastId: string,
+): Promise<WeeklyParticipant[]> {
+  const sb = getSupabase();
+  const { data: entries, error } = await sb
+    .from("fast_entries")
+    .select("*")
+    .eq("weekly_fast_id", weeklyFastId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  if (!entries || entries.length === 0) return [];
+
+  const ids = (entries as FastEntry[]).map((e) => e.id);
+  const { data: subs, error: subErr } = await sb
+    .from("fast_entry_subjects")
+    .select("*")
+    .in("fast_entry_id", ids);
+  if (subErr) throw subErr;
+
+  const subsByEntry = new Map<string, FastEntrySubject[]>();
+  for (const s of (subs ?? []) as FastEntrySubject[]) {
+    const list = subsByEntry.get(s.fast_entry_id) ?? [];
+    list.push(s);
+    subsByEntry.set(s.fast_entry_id, list);
+  }
+
+  return (entries as FastEntry[]).map((e) => {
+    const entrySubs = subsByEntry.get(e.id) ?? [];
+    const totalIntercessions = entrySubs.reduce(
+      (acc, s) => acc + (s.intercessions || 0),
+      0,
+    );
+    const perSubjectMinutes = entrySubs.reduce(
+      (acc, s) => acc + Number(s.hours || 0),
+      0,
+    );
+    const globalMinutes = e.global_hours != null ? Number(e.global_hours) : null;
+    const totalMinutes =
+      globalMinutes != null && Number.isFinite(globalMinutes)
+        ? globalMinutes
+        : perSubjectMinutes;
+    return {
+      entryId: e.id,
+      deviceId: e.device_id,
+      userName: e.user_name,
+      kind: e.kind,
+      fastDate: e.fast_date,
+      globalMinutes,
+      updatedAt: e.updated_at,
+      totalIntercessions,
+      totalMinutes,
+      bySubject: entrySubs.map((s) => ({
+        weekly_fast_subject_id: s.weekly_fast_subject_id,
+        custom_label: s.custom_label,
+        intercessions: s.intercessions || 0,
+        minutes: Number(s.hours || 0),
+      })),
+    };
+  });
 }
