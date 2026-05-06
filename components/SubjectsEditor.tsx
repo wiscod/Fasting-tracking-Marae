@@ -29,7 +29,7 @@ export function SubjectsEditor({
       </div>
 
       {rows.map((row, idx) => (
-        <div key={idx} className="grid grid-cols-[1fr_72px_72px] items-center gap-2">
+        <div key={idx} className="grid grid-cols-[1fr_72px_72px] items-start gap-2">
           {row.editable ? (
             <div className="flex items-center gap-1">
               <input
@@ -48,7 +48,7 @@ export function SubjectsEditor({
               </button>
             </div>
           ) : (
-            <span className="truncate text-sm text-slate-800">{row.label}</span>
+            <span className="text-sm text-slate-800 leading-snug">{row.label}</span>
           )}
           <input
             type="number"
