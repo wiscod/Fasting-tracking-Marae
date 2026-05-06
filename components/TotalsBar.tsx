@@ -3,7 +3,7 @@
 export function TotalsBar({
   totalIntercessions,
   totalHours,
-  goalHours = 24,
+  goalHours = 1440,
 }: {
   totalIntercessions: number;
   totalHours: number;
@@ -18,7 +18,7 @@ export function TotalsBar({
           {totalIntercessions}
         </div>
         <div className="rounded-md bg-slate-100 px-2 py-2 text-center text-sm font-semibold">
-          {formatHours(totalHours)}
+          {formatMinutes(totalHours)}
         </div>
       </div>
       <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
@@ -29,13 +29,16 @@ export function TotalsBar({
         />
       </div>
       <p className="text-right text-xs text-slate-500">
-        Objectif {goalHours} h · {pct.toFixed(0)}%
+        Objectif 24 h · {pct.toFixed(0)}%
       </p>
     </div>
   );
 }
 
-function formatHours(h: number): string {
-  if (Number.isInteger(h)) return `${h}`;
-  return h.toFixed(2).replace(/\.?0+$/, "");
+function formatMinutes(m: number): string {
+  if (!m) return "0min";
+  if (m < 60) return `${m}min`;
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return min ? `${h}h${String(min).padStart(2, "0")}` : `${h}h`;
 }

@@ -230,14 +230,14 @@ export function TeamFastClient({
       </div>
 
       <div className="card flex flex-col gap-2">
-        <label className="label">Heures globales (optionnel)</label>
+        <label className="label">Minutes globales (optionnel)</label>
         <input
           className="input"
           type="number"
           min={0}
-          step="0.25"
-          inputMode="decimal"
-          placeholder="Sinon, somme des heures par sujet"
+          step="1"
+          inputMode="numeric"
+          placeholder="Sinon, somme des minutes par sujet"
           value={globalHours}
           onChange={(e) => setGlobalHours(e.target.value)}
         />
@@ -250,7 +250,7 @@ export function TeamFastClient({
         <TotalsBar
           totalIntercessions={totals.intercessions}
           totalHours={totals.hours}
-          goalHours={24}
+          goalHours={1440}
         />
       </div>
 

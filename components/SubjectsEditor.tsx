@@ -79,13 +79,13 @@ export function SubjectsEditor({
             </div>
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                Heures
+                Minutes
               </label>
               <input
                 type="number"
                 inputMode="decimal"
                 min={0}
-                step="0.25"
+                step="1"
                 className="input text-center text-lg font-bold tabular-nums"
                 value={Number.isFinite(row.hours) ? row.hours : 0}
                 onChange={(e) =>
