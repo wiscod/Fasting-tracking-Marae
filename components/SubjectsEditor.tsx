@@ -64,7 +64,7 @@ export function SubjectsEditor({
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                Nb intercessions
+                Nb importunités
               </label>
               <input
                 type="number"

@@ -17,7 +17,7 @@ export default function HomePage() {
         </span>
         <span className="text-lg font-semibold">Jeûne d'équipe — Sem {week.week}</span>
         <span className="text-sm text-slate-500">
-          Saisis tes intercessions et tes heures de prière sur les sujets de la semaine.
+          Saisis tes importunités et tes minutes de prière sur les sujets de la semaine.
         </span>
       </Link>
 

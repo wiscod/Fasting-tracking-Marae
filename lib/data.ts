@@ -336,3 +336,288 @@ export async function getWeeklyParticipants(
     };
   });
 }
+
+// ─── Person summary ──────────────────────────────────────────────────────────
+
+export type PersonSummary = {
+  deviceId: string;
+  userName: string | null;
+  totalFasts: number;
+  totalTeamFasts: number;
+  totalPersonalFasts: number;
+  totalImportunites: number;
+  totalMinutes: number;
+  lastSeen: string;
+};
+
+export type PersonHistory = {
+  person: PersonSummary;
+  entries: (WeeklyParticipant & { weekLabel: string | null; weeklyFastId: string | null })[];
+  personalSubjects: string[];
+};
+
+export async function getAllPersons(): Promise<PersonSummary[]> {
+  const sb = getSupabase();
+  const { data: entries, error } = await sb
+    .from("fast_entries")
+    .select("id, device_id, user_name, kind, global_hours, updated_at")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  if (!entries || entries.length === 0) return [];
+
+  const ids = (entries as FastEntry[]).map((e) => e.id);
+  const { data: subs } = await sb
+    .from("fast_entry_subjects")
+    .select("fast_entry_id, intercessions, hours")
+    .in("fast_entry_id", ids);
+
+  const subsByEntry = new Map<string, { intercessions: number; hours: number }[]>();
+  for (const s of (subs ?? []) as FastEntrySubject[]) {
+    const list = subsByEntry.get(s.fast_entry_id) ?? [];
+    list.push(s);
+    subsByEntry.set(s.fast_entry_id, list);
+  }
+
+  const byDevice = new Map<string, PersonSummary>();
+  for (const e of entries as FastEntry[]) {
+    const entrySubs = subsByEntry.get(e.id) ?? [];
+    const imp = entrySubs.reduce((a, s) => a + (s.intercessions || 0), 0);
+    const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
+    const gm = e.global_hours != null ? Number(e.global_hours) : null;
+    const min = gm != null && Number.isFinite(gm) ? gm : perSub;
+
+    const existing = byDevice.get(e.device_id);
+    if (existing) {
+      existing.totalFasts += 1;
+      existing.totalTeamFasts += e.kind === "team" ? 1 : 0;
+      existing.totalPersonalFasts += e.kind === "personal" ? 1 : 0;
+      existing.totalImportunites += imp;
+      existing.totalMinutes += min;
+      if (e.updated_at > existing.lastSeen) {
+        existing.lastSeen = e.updated_at;
+        if (e.user_name) existing.userName = e.user_name;
+      }
+    } else {
+      byDevice.set(e.device_id, {
+        deviceId: e.device_id,
+        userName: e.user_name,
+        totalFasts: 1,
+        totalTeamFasts: e.kind === "team" ? 1 : 0,
+        totalPersonalFasts: e.kind === "personal" ? 1 : 0,
+        totalImportunites: imp,
+        totalMinutes: min,
+        lastSeen: e.updated_at,
+      });
+    }
+  }
+
+  return [...byDevice.values()].sort(
+    (a, b) => b.totalImportunites - a.totalImportunites,
+  );
+}
+
+export async function getPersonHistory(deviceId: string): Promise<PersonHistory> {
+  const sb = getSupabase();
+  const { data: entries, error } = await sb
+    .from("fast_entries")
+    .select("*")
+    .eq("device_id", deviceId)
+    .order("fast_date", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+
+  const castEntries = (entries ?? []) as FastEntry[];
+  const ids = castEntries.map((e) => e.id);
+
+  const [subsRes, wfRes] = await Promise.all([
+    ids.length
+      ? sb.from("fast_entry_subjects").select("*").in("fast_entry_id", ids)
+      : { data: [], error: null },
+    sb.from("weekly_fasts").select("id, year, week"),
+  ]);
+  if (subsRes.error) throw subsRes.error;
+
+  const wfMap = new Map<string, { year: number; week: number }>();
+  for (const wf of (wfRes.data ?? []) as WeeklyFast[]) {
+    wfMap.set(wf.id, { year: wf.year, week: wf.week });
+  }
+
+  const subsByEntry = new Map<string, FastEntrySubject[]>();
+  for (const s of (subsRes.data ?? []) as FastEntrySubject[]) {
+    const list = subsByEntry.get(s.fast_entry_id) ?? [];
+    list.push(s);
+    subsByEntry.set(s.fast_entry_id, list);
+  }
+
+  let totalImportunites = 0;
+  let totalMinutes = 0;
+  let totalTeamFasts = 0;
+  let totalPersonalFasts = 0;
+  const personalSubjectsSet = new Set<string>();
+
+  const mappedEntries = castEntries.map((e) => {
+    const entrySubs = subsByEntry.get(e.id) ?? [];
+    const imp = entrySubs.reduce((a, s) => a + (s.intercessions || 0), 0);
+    const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
+    const gm = e.global_hours != null ? Number(e.global_hours) : null;
+    const min = gm != null && Number.isFinite(gm) ? gm : perSub;
+
+    totalImportunites += imp;
+    totalMinutes += min;
+    if (e.kind === "team") totalTeamFasts++;
+    else {
+      totalPersonalFasts++;
+      for (const s of entrySubs) {
+        if (s.custom_label?.trim()) personalSubjectsSet.add(s.custom_label.trim());
+      }
+    }
+
+    const wf = e.weekly_fast_id ? wfMap.get(e.weekly_fast_id) : null;
+    const weekLabel = wf ? `Sem ${wf.week} (${wf.year})` : null;
+
+    return {
+      entryId: e.id,
+      deviceId: e.device_id,
+      userName: e.user_name,
+      kind: e.kind,
+      fastDate: e.fast_date,
+      globalMinutes: gm,
+      updatedAt: e.updated_at,
+      totalIntercessions: imp,
+      totalMinutes: min,
+      weekLabel,
+      weeklyFastId: e.weekly_fast_id,
+      bySubject: entrySubs.map((s) => ({
+        weekly_fast_subject_id: s.weekly_fast_subject_id,
+        custom_label: s.custom_label,
+        intercessions: s.intercessions || 0,
+        minutes: Number(s.hours || 0),
+      })),
+    };
+  });
+
+  const lastEntry = castEntries[0];
+  const person: PersonSummary = {
+    deviceId,
+    userName: castEntries.find((e) => e.user_name)?.user_name ?? null,
+    totalFasts: castEntries.length,
+    totalTeamFasts,
+    totalPersonalFasts,
+    totalImportunites,
+    totalMinutes,
+    lastSeen: lastEntry?.updated_at ?? "",
+  };
+
+  return {
+    person,
+    entries: mappedEntries,
+    personalSubjects: [...personalSubjectsSet],
+  };
+}
+
+// ─── Weekly aggregates for charts ────────────────────────────────────────────
+
+export type WeeklyAggregate = {
+  year: number;
+  week: number;
+  label: string;
+  teamCount: number;
+  personalCount: number;
+  totalImportunites: number;
+  totalMinutes: number;
+};
+
+export async function getWeeklyAggregates(
+  fromYear: number,
+  fromWeek: number,
+  toYear: number,
+  toWeek: number,
+): Promise<WeeklyAggregate[]> {
+  const sb = getSupabase();
+
+  // Fetch all weekly_fasts in range
+  const { data: wfs, error: wfErr } = await sb
+    .from("weekly_fasts")
+    .select("id, year, week");
+  if (wfErr) throw wfErr;
+
+  const inRange = (y: number, w: number) => {
+    const from = fromYear * 100 + fromWeek;
+    const to = toYear * 100 + toWeek;
+    const cur = y * 100 + w;
+    return cur >= from && cur <= to;
+  };
+
+  const wfsInRange = ((wfs ?? []) as WeeklyFast[]).filter((wf) =>
+    inRange(wf.year, wf.week),
+  );
+  const wfIds = wfsInRange.map((wf) => wf.id);
+  const wfById = new Map(wfsInRange.map((wf) => [wf.id, wf]));
+
+  // Fetch all entries linked to these weekly_fasts
+  const { data: entries, error: eErr } = await sb
+    .from("fast_entries")
+    .select("id, device_id, kind, global_hours, weekly_fast_id, fast_date")
+    .in("weekly_fast_id", wfIds.length ? wfIds : ["none"]);
+  if (eErr) throw eErr;
+
+  const castEntries = (entries ?? []) as FastEntry[];
+  const ids = castEntries.map((e) => e.id);
+  const { data: subs } = ids.length
+    ? await sb
+        .from("fast_entry_subjects")
+        .select("fast_entry_id, intercessions, hours")
+        .in("fast_entry_id", ids)
+    : { data: [] };
+
+  const subsByEntry = new Map<string, { intercessions: number; hours: number }[]>();
+  for (const s of (subs ?? []) as FastEntrySubject[]) {
+    const list = subsByEntry.get(s.fast_entry_id) ?? [];
+    list.push(s);
+    subsByEntry.set(s.fast_entry_id, list);
+  }
+
+  // Build aggregates keyed by "year-week"
+  const aggMap = new Map<string, WeeklyAggregate>();
+
+  // Init slots for all weeks in range
+  for (const wf of wfsInRange) {
+    const key = `${wf.year}-${wf.week}`;
+    if (!aggMap.has(key)) {
+      aggMap.set(key, {
+        year: wf.year,
+        week: wf.week,
+        label: `S${wf.week}`,
+        teamCount: 0,
+        personalCount: 0,
+        totalImportunites: 0,
+        totalMinutes: 0,
+      });
+    }
+  }
+
+  for (const e of castEntries) {
+    const wf = e.weekly_fast_id ? wfById.get(e.weekly_fast_id) : null;
+    if (!wf) continue;
+    const key = `${wf.year}-${wf.week}`;
+    const agg = aggMap.get(key);
+    if (!agg) continue;
+
+    const entrySubs = subsByEntry.get(e.id) ?? [];
+    const imp = entrySubs.reduce((a, s) => a + (s.intercessions || 0), 0);
+    const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
+    const gm = e.global_hours != null ? Number(e.global_hours) : null;
+    const min = gm != null && Number.isFinite(gm) ? gm : perSub;
+
+    if (e.kind === "team") agg.teamCount++;
+    else agg.personalCount++;
+    agg.totalImportunites += imp;
+    agg.totalMinutes += min;
+  }
+
+  return [...aggMap.values()].sort((a, b) => {
+    const ak = a.year * 100 + a.week;
+    const bk = b.year * 100 + b.week;
+    return ak - bk;
+  });
+}

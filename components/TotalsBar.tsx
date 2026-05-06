@@ -12,13 +12,15 @@ export function TotalsBar({
   const pct = Math.max(0, Math.min(100, (totalHours / goalHours) * 100));
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-[1fr_72px_72px] items-center gap-2 px-1">
+      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 px-1">
         <span className="text-sm font-semibold">Total</span>
-        <div className="rounded-md bg-slate-100 px-2 py-2 text-center text-sm font-semibold">
-          {totalIntercessions}
+        <div className="text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Importunités</p>
+          <p className="text-lg font-bold tabular-nums text-slate-800">{totalIntercessions}</p>
         </div>
-        <div className="rounded-md bg-slate-100 px-2 py-2 text-center text-sm font-semibold">
-          {formatMinutes(totalHours)}
+        <div className="text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Prière</p>
+          <p className="text-lg font-bold tabular-nums text-slate-800">{formatMinutes(totalHours)}</p>
         </div>
       </div>
       <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
@@ -35,10 +37,10 @@ export function TotalsBar({
   );
 }
 
-function formatMinutes(m: number): string {
+export function formatMinutes(m: number): string {
   if (!m) return "0min";
-  if (m < 60) return `${m}min`;
+  if (m < 60) return `${Math.round(m)}min`;
   const h = Math.floor(m / 60);
-  const min = m % 60;
+  const min = Math.round(m % 60);
   return min ? `${h}h${String(min).padStart(2, "0")}` : `${h}h`;
 }

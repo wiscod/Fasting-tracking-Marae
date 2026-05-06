@@ -11,7 +11,11 @@ import type { WeeklyParticipant } from "@/lib/data";
 import type { WeeklyFast, WeeklyFastSubject } from "@/lib/types";
 import { isoWeeksInYear } from "@/lib/week";
 import { WeeklyStats } from "@/components/WeeklyStats";
+import { MonthlyView } from "@/components/admin/MonthlyView";
+import { YearlyView } from "@/components/admin/YearlyView";
+import { ProfilesView } from "@/components/admin/ProfilesView";
 
+type Tab = "semaine" | "mois" | "annee" | "profils";
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 
 export function AdminClient({
@@ -22,6 +26,63 @@ export function AdminClient({
   initialWeek: number;
 }) {
   const router = useRouter();
+  const [tab, setTab] = useState<Tab>("semaine");
+
+  async function handleLogout() {
+    await fetch("/api/admin/logout", { method: "POST" });
+    router.push("/admin/login");
+    router.refresh();
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Tab bar */}
+      <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
+        {(["semaine", "mois", "annee", "profils"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors capitalize ${
+              tab === t
+                ? "bg-white text-brand-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {t === "semaine" ? "Semaine" : t === "mois" ? "Mois" : t === "annee" ? "Année" : "Profils"}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {tab === "semaine" && (
+        <WeekTab initialYear={initialYear} initialWeek={initialWeek} />
+      )}
+      {tab === "mois" && <MonthlyView />}
+      {tab === "annee" && <YearlyView />}
+      {tab === "profils" && <ProfilesView />}
+
+      {/* Logout */}
+      <div className="border-t border-slate-200 pt-2">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="btn-secondary w-full text-slate-500"
+        >
+          Se déconnecter
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WeekTab({
+  initialYear,
+  initialWeek,
+}: {
+  initialYear: number;
+  initialWeek: number;
+}) {
   const [year, setYear] = useState(initialYear);
   const [week, setWeek] = useState(initialWeek);
   const [status, setStatus] = useState<Status>("loading");
@@ -64,21 +125,14 @@ export function AdminClient({
       }
     }
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [year, week, statsRefreshKey]);
 
   function navigate(delta: number) {
     let y = year;
     let w = week + delta;
-    if (w < 1) {
-      y -= 1;
-      w = isoWeeksInYear(y);
-    } else if (w > isoWeeksInYear(y)) {
-      y += 1;
-      w = 1;
-    }
+    if (w < 1) { y -= 1; w = isoWeeksInYear(y); }
+    else if (w > isoWeeksInYear(y)) { y += 1; w = 1; }
     setYear(y);
     setWeek(w);
   }
@@ -87,26 +141,21 @@ export function AdminClient({
     setLabels((prev) => prev.map((l, j) => (j === i ? value : l)));
   }
 
-  function addSubject() {
-    setLabels((prev) => [...prev, ""]);
-  }
-
-  function removeSubject(i: number) {
-    setLabels((prev) => prev.filter((_, j) => j !== i));
-  }
+  function addSubject() { setLabels((prev) => [...prev, ""]); }
+  function removeSubject(i: number) { setLabels((prev) => prev.filter((_, j) => j !== i)); }
 
   async function handleSave() {
     if (!wf) return;
     setStatus("saving");
     setError(null);
     try {
-      const subjects = labels
+      const subjectsToSave = labels
         .map((label, i) => ({ position: i + 1, label: label.trim() }))
         .filter((s) => s.label !== "");
       const res = await fetch("/api/admin/subjects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weeklyFastId: wf.id, subjects }),
+        body: JSON.stringify({ weeklyFastId: wf.id, subjects: subjectsToSave }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -120,58 +169,30 @@ export function AdminClient({
     }
   }
 
-  async function handleLogout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
-    router.refresh();
-  }
-
   if (status === "loading") {
     return <p className="text-sm text-slate-500">Chargement…</p>;
   }
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Navigation semaine */}
+      {/* Week navigator */}
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          aria-label="Semaine précédente"
-          onClick={() => navigate(-1)}
-          className="btn-secondary"
-        >
-          ←
-        </button>
+        <button type="button" aria-label="Semaine précédente" onClick={() => navigate(-1)} className="btn-secondary">←</button>
         <div className="text-center">
-          <p className="text-xs uppercase tracking-wide text-slate-500">
-            Année {year}
-          </p>
+          <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>
           <p className="text-lg font-semibold">Sem {week}</p>
-          {wf?.title && (
-            <p className="text-xs text-slate-500">{wf.title}</p>
-          )}
+          {wf?.title && <p className="text-xs text-slate-500">{wf.title}</p>}
         </div>
-        <button
-          type="button"
-          aria-label="Semaine suivante"
-          onClick={() => navigate(1)}
-          className="btn-secondary"
-        >
-          →
-        </button>
+        <button type="button" aria-label="Semaine suivante" onClick={() => navigate(1)} className="btn-secondary">→</button>
       </div>
 
-      {/* Sujets de prière */}
+      {/* Subject editor */}
       <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-slate-700">
-          Sujets de prière
-        </h2>
+        <h2 className="text-sm font-semibold text-slate-700">Sujets de prière</h2>
         <div className="flex flex-col gap-2">
           {labels.map((label, i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="w-5 shrink-0 text-right text-sm text-slate-400">
-                {i + 1}
-              </span>
+              <span className="w-5 shrink-0 text-right text-sm text-slate-400">{i + 1}</span>
               <input
                 className="input"
                 placeholder={`Sujet ${i + 1}`}
@@ -190,40 +211,23 @@ export function AdminClient({
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={addSubject}
-          className="self-start text-sm font-medium text-brand-600 hover:text-brand-700"
-        >
+        <button type="button" onClick={addSubject} className="self-start text-sm font-medium text-brand-600 hover:text-brand-700">
           + Ajouter un sujet
         </button>
       </div>
 
       {error && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
+        <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
       )}
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={status === "saving"}
-        className="btn-primary"
-      >
-        {status === "saving"
-          ? "Enregistrement…"
-          : status === "saved"
-            ? "✓ Enregistré"
-            : "Enregistrer les sujets"}
+      <button type="button" onClick={handleSave} disabled={status === "saving"} className="btn-primary">
+        {status === "saving" ? "Enregistrement…" : status === "saved" ? "✓ Enregistré" : "Enregistrer les sujets"}
       </button>
 
-      {/* Dashboard stats */}
+      {/* Stats */}
       <section className="flex flex-col gap-3 border-t border-slate-200 pt-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-700">
-            Stats de la semaine
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-700">Stats de la semaine</h2>
           <button
             type="button"
             onClick={() => setStatsRefreshKey((k) => k + 1)}
@@ -240,16 +244,6 @@ export function AdminClient({
           <WeeklyStats participants={participants} subjects={subjects} />
         )}
       </section>
-
-      <div className="border-t border-slate-200 pt-2">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="btn-secondary w-full text-slate-500"
-        >
-          Se déconnecter
-        </button>
-      </div>
     </div>
   );
 }
