@@ -46,11 +46,16 @@ export function ProfilesView() {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xl font-bold tabular-nums text-brand-600">#{i + 1}</span>
                 <span className="text-base font-semibold text-slate-800">
                   {p.userName?.trim() || <span className="italic text-slate-500">Anonyme</span>}
                 </span>
+                {p.isDirigent && (
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                    Dirigeant
+                  </span>
+                )}
               </div>
               <div className="mt-1 flex flex-wrap gap-2">
                 {p.totalTeamFasts > 0 && (
@@ -89,10 +94,37 @@ function PersonProfileView({
 }) {
   const [history, setHistory] = useState<PersonHistory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(false);
+  const [isDirigent, setIsDirigent] = useState(false);
 
   useEffect(() => {
-    getPersonHistory(deviceId).then(setHistory).finally(() => setLoading(false));
+    getPersonHistory(deviceId).then((h) => {
+      setHistory(h);
+      setIsDirigent(h.person.isDirigent);
+    }).finally(() => setLoading(false));
   }, [deviceId]);
+
+  async function toggleDirigent() {
+    if (!history) return;
+    const next = !isDirigent;
+    setRoleLoading(true);
+    try {
+      const res = await fetch("/api/admin/roles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: history.person.userId, isDirigent: next }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Erreur");
+      }
+      setIsDirigent(next);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRoleLoading(false);
+    }
+  }
 
   if (loading) return <p className="text-center text-sm text-slate-500">Chargement…</p>;
   if (!history) return <p className="text-center text-sm text-red-500">Erreur de chargement.</p>;
@@ -122,12 +154,28 @@ function PersonProfileView({
 
       {/* Header */}
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-2xl font-bold tracking-tight text-slate-800">
-          {person.userName?.trim() || <span className="italic text-slate-400">Anonyme</span>}
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Dernière activité : {formatRelative(person.lastSeen)}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-800">
+              {person.userName?.trim() || <span className="italic text-slate-400">Anonyme</span>}
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Dernière activité : {formatRelative(person.lastSeen)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleDirigent}
+            disabled={roleLoading}
+            className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+              isDirigent
+                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+            }`}
+          >
+            {roleLoading ? "…" : isDirigent ? "★ Dirigeant" : "☆ Dirigeant"}
+          </button>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {person.totalTeamFasts > 0 && (
             <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
@@ -141,6 +189,7 @@ function PersonProfileView({
           )}
         </div>
       </div>
+
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-2">

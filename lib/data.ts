@@ -16,22 +16,27 @@ async function getUserId(): Promise<string> {
 export async function getOrCreateWeeklyFast(
   year: number,
   week: number,
-): Promise<WeeklyFast> {
+  opts?: { dirigeant?: boolean; create?: boolean },
+): Promise<WeeklyFast | null> {
   const sb = getSupabaseBrowser();
+  const isDirigent = opts?.dirigeant ?? false;
+  const shouldCreate = opts?.create ?? !isDirigent; // auto-create for team fasts, not for dirigeant
   const existing = await sb
     .from("weekly_fasts")
     .select("*")
     .eq("year", year)
     .eq("week", week)
+    .eq("is_dirigeant", isDirigent)
     .maybeSingle();
   if (existing.error) throw existing.error;
   if (existing.data) return existing.data as WeeklyFast;
+  if (!shouldCreate) return null;
 
   // Auth users can't insert weekly_fasts (RLS) — go through API route
   const res = await fetch("/api/weekly-fast/ensure", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ year, week }),
+    body: JSON.stringify({ year, week, isDirigent }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -306,6 +311,7 @@ export type PersonSummary = {
   userId: string;
   userName: string | null;
   phone: string | null;
+  isDirigent: boolean;
   totalFasts: number;
   totalTeamFasts: number;
   totalPersonalFasts: number;

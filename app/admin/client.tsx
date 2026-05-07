@@ -87,6 +87,7 @@ function WeekTab({
   const [week, setWeek] = useState(initialWeek);
   const [status, setStatus] = useState<Status>("loading");
   const [error, setError] = useState<string | null>(null);
+  const [fastType, setFastType] = useState<"equipe" | "dirigeant">("equipe");
   const [wf, setWf] = useState<WeeklyFast | null>(null);
   const [labels, setLabels] = useState<string[]>(["", "", ""]);
   const [subjects, setSubjects] = useState<WeeklyFastSubject[]>([]);
@@ -101,7 +102,11 @@ function WeekTab({
       setError(null);
       setStatsLoading(true);
       try {
-        const weeklyFast = await getOrCreateWeeklyFast(year, week);
+        const weeklyFast = await getOrCreateWeeklyFast(year, week, {
+          dirigeant: fastType === "dirigeant",
+          create: true,
+        });
+        if (!weeklyFast) throw new Error("Jeûne introuvable");
         const [subs, parts] = await Promise.all([
           getWeeklyFastSubjects(weeklyFast.id),
           getWeeklyParticipants(weeklyFast.id),
@@ -126,7 +131,7 @@ function WeekTab({
     }
     load();
     return () => { cancelled = true; };
-  }, [year, week, statsRefreshKey]);
+  }, [year, week, fastType, statsRefreshKey]);
 
   function navigate(delta: number) {
     let y = year;
@@ -186,9 +191,29 @@ function WeekTab({
         <button type="button" aria-label="Semaine suivante" onClick={() => navigate(1)} className="btn-secondary">→</button>
       </div>
 
+      {/* Fast type switcher */}
+      <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
+        {(["equipe", "dirigeant"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setFastType(t)}
+            className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
+              fastType === t
+                ? "bg-white text-brand-700 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {t === "equipe" ? "Équipe" : "Dirigeants"}
+          </button>
+        ))}
+      </div>
+
       {/* Subject editor */}
       <div className="card flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-slate-700">Sujets de prière</h2>
+        <h2 className="text-sm font-semibold text-slate-700">
+          Sujets de prière {fastType === "dirigeant" ? <span className="text-amber-600">(dirigeants)</span> : ""}
+        </h2>
         <div className="flex flex-col gap-2">
           {labels.map((label, i) => (
             <div key={i} className="flex items-center gap-2">

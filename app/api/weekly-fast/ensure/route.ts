@@ -7,10 +7,12 @@ export async function POST(req: Request) {
   if (!auth.user) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
-  const { year, week } = await req.json();
+  const body = await req.json();
+  const { year, week, isDirigent } = body;
   if (typeof year !== "number" || typeof week !== "number") {
     return NextResponse.json({ error: "year/week requis" }, { status: 400 });
   }
+  const isDir = isDirigent === true;
 
   const service = getSupabaseService();
   const existing = await service
@@ -18,6 +20,7 @@ export async function POST(req: Request) {
     .select("*")
     .eq("year", year)
     .eq("week", week)
+    .eq("is_dirigeant", isDir)
     .maybeSingle();
   if (existing.error) {
     return NextResponse.json({ error: existing.error.message }, { status: 500 });
@@ -25,9 +28,12 @@ export async function POST(req: Request) {
   if (existing.data) {
     return NextResponse.json({ weeklyFast: existing.data });
   }
+  const title = isDir
+    ? `Jeûne des dirigeants — Sem ${week}`
+    : `Jeûne d'équipe — Sem ${week}`;
   const created = await service
     .from("weekly_fasts")
-    .insert({ year, week, title: `Jeûne d'équipe — Sem ${week}` })
+    .insert({ year, week, title, is_dirigeant: isDir })
     .select("*")
     .single();
   if (created.error) {

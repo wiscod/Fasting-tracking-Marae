@@ -22,15 +22,15 @@ export async function POST(req: Request) {
   const body = (await req.json()) as Body;
   const sb = getSupabaseService();
 
-  // Map of user_id → profile (first_name, last_name, phone)
+  // Map of user_id → profile (first_name, last_name, phone, is_dirigeant)
   async function loadProfiles(userIds: string[]) {
-    if (userIds.length === 0) return new Map<string, { first_name: string; last_name: string | null; phone: string }>();
+    if (userIds.length === 0) return new Map<string, { first_name: string; last_name: string | null; phone: string; is_dirigeant: boolean }>();
     const { data } = await sb
       .from("profiles")
-      .select("id, first_name, last_name, phone")
+      .select("id, first_name, last_name, phone, is_dirigeant")
       .in("id", userIds);
     return new Map(
-      (data ?? []).map((p: { id: string; first_name: string; last_name: string | null; phone: string }) => [p.id, p]),
+      (data ?? []).map((p: { id: string; first_name: string; last_name: string | null; phone: string; is_dirigeant: boolean }) => [p.id, p]),
     );
   }
 
@@ -108,6 +108,7 @@ export async function POST(req: Request) {
       userId: string;
       userName: string | null;
       phone: string | null;
+      isDirigent: boolean;
       totalFasts: number;
       totalTeamFasts: number;
       totalPersonalFasts: number;
@@ -135,6 +136,7 @@ export async function POST(req: Request) {
           userId: e.user_id,
           userName: fullName(p),
           phone: p?.phone ?? null,
+          isDirigent: p?.is_dirigeant ?? false,
           totalFasts: 1,
           totalTeamFasts: e.kind === "team" ? 1 : 0,
           totalPersonalFasts: e.kind === "personal" ? 1 : 0,
@@ -216,6 +218,7 @@ export async function POST(req: Request) {
         userId: body.userId,
         userName,
         phone: profile?.phone ?? null,
+        isDirigent: profile?.is_dirigeant ?? false,
         totalFasts: cast.length,
         totalTeamFasts,
         totalPersonalFasts,

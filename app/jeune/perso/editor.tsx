@@ -87,7 +87,7 @@ export function PersonalEditor({
       try {
         const w = getIsoWeek(new Date(fastDate || today));
         const wf = await getOrCreateWeeklyFast(w.year, w.week);
-        if (cancelled) return;
+        if (!wf || cancelled) return;
         if (weeklyFastId !== wf.id) {
           setWeeklyFastId(wf.id);
           const subs = await getWeeklyFastSubjects(wf.id);

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { SubjectsEditor, SubjectRow } from "@/components/SubjectsEditor";
 import { isoWeeksInYear } from "@/lib/week";
@@ -13,9 +12,9 @@ import {
 } from "@/lib/data";
 import type { WeeklyFast, WeeklyFastSubject } from "@/lib/types";
 
-type Status = "loading" | "ready" | "saving" | "saved" | "error";
+type Status = "loading" | "ready" | "saving" | "saved" | "error" | "no-fast";
 
-export function TeamFastClient({
+export function DirigentFastClient({
   initialYear,
   initialWeek,
 }: {
@@ -38,8 +37,11 @@ export function TeamFastClient({
       setStatus("loading");
       setErrorMsg(null);
       try {
-        const wf = await getOrCreateWeeklyFast(year, week);
-        if (!wf) throw new Error("Jeûne introuvable");
+        const wf = await getOrCreateWeeklyFast(year, week, { dirigeant: true });
+        if (!wf) {
+          if (!cancelled) setStatus("no-fast");
+          return;
+        }
         const subs = await getWeeklyFastSubjects(wf.id);
         const { entry, subjects } = await getTeamFastEntry(wf.id);
         if (cancelled) return;
@@ -80,9 +82,7 @@ export function TeamFastClient({
       }
     }
     load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [year, week]);
 
   const totals = useMemo(() => {
@@ -99,14 +99,7 @@ export function TeamFastClient({
   function addCustom() {
     setRows((rs) => [
       ...rs,
-      {
-        weekly_fast_subject_id: null,
-        custom_label: "",
-        label: "",
-        intercessions: 0,
-        hours: 0,
-        editable: true,
-      },
+      { weekly_fast_subject_id: null, custom_label: "", label: "", intercessions: 0, hours: 0, editable: true },
     ]);
   }
   function removeCustom(idx: number) {
@@ -127,7 +120,6 @@ export function TeamFastClient({
           hours: r.hours || 0,
           position: i,
         }));
-
       const gh = globalHours.trim() === "" ? null : Number(globalHours);
       await saveTeamFastEntry({
         weeklyFastId: weeklyFast.id,
@@ -146,6 +138,17 @@ export function TeamFastClient({
     return <p className="text-sm text-slate-500">Chargement…</p>;
   }
 
+  if (status === "no-fast") {
+    return (
+      <div className="card text-sm text-slate-700">
+        <p className="font-medium">Aucun jeûne des dirigeants pour Sem {week}.</p>
+        <p className="mt-1 text-slate-500">
+          L'admin doit publier un jeûne des dirigeants pour cette semaine.
+        </p>
+      </div>
+    );
+  }
+
   if (status === "error" && !weeklyFast) {
     return (
       <div className="card border-red-200 bg-red-50 text-sm text-red-800">
@@ -160,11 +163,7 @@ export function TeamFastClient({
       <div className="card text-sm text-slate-700">
         <p className="font-medium">Pas encore de sujets pour Sem {week}.</p>
         <p className="mt-1 text-slate-500">
-          L'admin doit configurer les sujets de la semaine via la{" "}
-          <Link href="/admin" className="text-brand-600 underline hover:text-brand-700">
-            page admin
-          </Link>
-          .
+          L'admin doit configurer les sujets du jeûne des dirigeants.
         </p>
       </div>
     );
@@ -258,13 +257,8 @@ function navigateWeek(
 ) {
   let y = year;
   let w = week + delta;
-  if (w < 1) {
-    y -= 1;
-    w = isoWeeksInYear(y);
-  } else if (w > isoWeeksInYear(y)) {
-    y += 1;
-    w = 1;
-  }
+  if (w < 1) { y -= 1; w = isoWeeksInYear(y); }
+  else if (w > isoWeeksInYear(y)) { y += 1; w = 1; }
   setYear(y);
   setWeek(w);
 }

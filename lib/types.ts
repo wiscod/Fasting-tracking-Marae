@@ -5,6 +5,7 @@ export type WeeklyFast = {
   title: string | null;
   start_date: string | null;
   end_date: string | null;
+  is_dirigeant: boolean;
   created_at: string;
 };
 
@@ -46,6 +47,7 @@ export type Profile = {
   last_name: string | null;
   phone: string;
   discipleship_maker: string;
+  is_dirigeant: boolean;
   created_at: string;
   updated_at: string;
 };

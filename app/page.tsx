@@ -7,13 +7,15 @@ export default async function HomePage() {
   const sb = getSupabaseServer();
   const { data: auth } = await sb.auth.getUser();
   let firstName: string | null = null;
+  let isDirigent = false;
   if (auth.user) {
     const { data: profile } = await sb
       .from("profiles")
-      .select("first_name")
+      .select("first_name, is_dirigeant")
       .eq("id", auth.user.id)
       .maybeSingle();
     firstName = profile?.first_name ?? null;
+    isDirigent = profile?.is_dirigeant ?? false;
   }
 
   return (
@@ -43,6 +45,16 @@ export default async function HomePage() {
           Liste unifiée de tes jeûnes (équipe + personnels).
         </span>
       </Link>
+
+      {isDirigent && (
+        <Link href="/jeune/dirigeant" className="card flex flex-col gap-1 hover:border-amber-500 border-amber-200">
+          <span className="text-xs uppercase tracking-wide text-amber-600">Dirigeants · Cette semaine</span>
+          <span className="text-lg font-semibold">Jeûne des dirigeants — Sem {week.week}</span>
+          <span className="text-sm text-slate-500">
+            Saisis tes importunités sur les sujets des dirigeants.
+          </span>
+        </Link>
+      )}
     </main>
   );
 }
