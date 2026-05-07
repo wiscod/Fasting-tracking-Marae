@@ -11,6 +11,7 @@ export default function CompleteProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [discipleshipMaker, setDiscipleshipMaker] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -34,12 +35,14 @@ export default function CompleteProfilePage() {
     if (!userId) return;
     if (!firstName.trim()) return setError("Le prénom est obligatoire.");
     if (!phone) return setError("Le numéro de téléphone est invalide.");
+    if (!discipleshipMaker.trim()) return setError("Le nom du faiseur de disciple est obligatoire.");
     setLoading(true);
     const { error: upErr } = await sb.from("profiles").upsert({
       id: userId,
       first_name: firstName.trim(),
       last_name: lastName.trim() || null,
       phone,
+      discipleship_maker: discipleshipMaker.trim(),
     });
     setLoading(false);
     if (upErr) {
@@ -70,6 +73,17 @@ export default function CompleteProfilePage() {
           <div className="mt-1">
             <PhoneInput value={phone} onChange={setPhone} />
           </div>
+        </div>
+        <div>
+          <label className="label">Faiseur de disciple *</label>
+          <input
+            className="input mt-1"
+            placeholder="Prénom et nom"
+            value={discipleshipMaker}
+            onChange={(e) => setDiscipleshipMaker(e.target.value)}
+            required
+          />
+          <p className="mt-1 text-xs text-slate-500">La personne qui te suit spirituellement.</p>
         </div>
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <button type="submit" disabled={loading} className="btn-primary">

@@ -14,6 +14,7 @@ export default function SignupPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
+  const [discipleshipMaker, setDiscipleshipMaker] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState(false);
@@ -23,6 +24,7 @@ export default function SignupPage() {
     setError(null);
     if (!firstName.trim()) return setError("Le prénom est obligatoire.");
     if (!phone) return setError("Le numéro de téléphone est invalide.");
+    if (!discipleshipMaker.trim()) return setError("Le nom du faiseur de disciple est obligatoire.");
 
     setLoading(true);
     const { data, error: signErr } = await sb.auth.signUp({
@@ -52,6 +54,7 @@ export default function SignupPage() {
       first_name: firstName.trim(),
       last_name: lastName.trim() || null,
       phone,
+      discipleship_maker: discipleshipMaker.trim(),
     });
     setLoading(false);
     if (profErr) {
@@ -96,6 +99,17 @@ export default function SignupPage() {
           <div className="mt-1">
             <PhoneInput value={phone} onChange={setPhone} />
           </div>
+        </div>
+        <div>
+          <label className="label">Faiseur de disciple *</label>
+          <input
+            className="input mt-1"
+            placeholder="Prénom et nom"
+            value={discipleshipMaker}
+            onChange={(e) => setDiscipleshipMaker(e.target.value)}
+            required
+          />
+          <p className="mt-1 text-xs text-slate-500">La personne qui te suit spirituellement.</p>
         </div>
         <div>
           <label className="label">Email *</label>
