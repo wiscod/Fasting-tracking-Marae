@@ -12,6 +12,7 @@ type Body = {
   action: string;
   weeklyFastId?: string;
   userId?: string;
+  entryId?: string;
   fromYear?: number;
   fromWeek?: number;
   toYear?: number;
@@ -300,6 +301,14 @@ export async function POST(req: Request) {
     return NextResponse.json(
       [...aggMap.values()].sort((a, b) => (a.year * 100 + a.week) - (b.year * 100 + b.week)),
     );
+  }
+
+  if (body.action === "deleteEntry") {
+    if (!body.entryId) return NextResponse.json({ error: "entryId requis" }, { status: 400 });
+    await sb.from("fast_entry_subjects").delete().eq("fast_entry_id", body.entryId);
+    const { error } = await sb.from("fast_entries").delete().eq("id", body.entryId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Action inconnue" }, { status: 400 });

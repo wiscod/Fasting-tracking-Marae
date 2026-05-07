@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   getAllPersons,
   getPersonHistory,
+  deleteEntryAdmin,
   type PersonSummary,
   type PersonHistory,
 } from "@/lib/data";
@@ -93,6 +94,7 @@ function PersonProfileView({
   onBack: () => void;
 }) {
   const [history, setHistory] = useState<PersonHistory | null>(null);
+  const [entries, setEntries] = useState<PersonHistory["entries"]>([]);
   const [loading, setLoading] = useState(true);
   const [roleLoading, setRoleLoading] = useState(false);
   const [isDirigent, setIsDirigent] = useState(false);
@@ -100,9 +102,20 @@ function PersonProfileView({
   useEffect(() => {
     getPersonHistory(deviceId).then((h) => {
       setHistory(h);
+      setEntries(h.entries);
       setIsDirigent(h.person.isDirigent);
     }).finally(() => setLoading(false));
   }, [deviceId]);
+
+  async function handleDeleteEntry(entryId: string) {
+    if (!confirm("Supprimer cette entrée ?")) return;
+    try {
+      await deleteEntryAdmin(entryId);
+      setEntries((prev) => prev.filter((e) => e.entryId !== entryId));
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   async function toggleDirigent() {
     if (!history) return;
@@ -129,7 +142,7 @@ function PersonProfileView({
   if (loading) return <p className="text-center text-sm text-slate-500">Chargement…</p>;
   if (!history) return <p className="text-center text-sm text-red-500">Erreur de chargement.</p>;
 
-  const { person, entries, personalSubjects } = history;
+  const { person, personalSubjects } = history;
 
   // Build chart data from entries (chronological, last 12)
   const chronoEntries = [...entries].reverse().slice(-12);
@@ -142,8 +155,8 @@ function PersonProfileView({
     value: e.totalMinutes,
   }));
 
-  const teamEntries = entries.filter((e) => e.kind === "team");
-  const personalEntries = entries.filter((e) => e.kind === "personal");
+  const teamEntries = entries.filter((e: { kind: string }) => e.kind === "team");
+  const personalEntries = entries.filter((e: { kind: string }) => e.kind === "personal");
 
   return (
     <div className="flex flex-col gap-4">
@@ -232,7 +245,7 @@ function PersonProfileView({
         <section className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold text-slate-700">Jeûnes d'équipe ({teamEntries.length})</h3>
           {teamEntries.map((e) => (
-            <EntryCard key={e.entryId} entry={e} />
+            <EntryCard key={e.entryId} entry={e} onDelete={handleDeleteEntry} />
           ))}
         </section>
       )}
@@ -242,7 +255,7 @@ function PersonProfileView({
         <section className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold text-slate-700">Jeûnes personnels ({personalEntries.length})</h3>
           {personalEntries.map((e) => (
-            <EntryCard key={e.entryId} entry={e} />
+            <EntryCard key={e.entryId} entry={e} onDelete={handleDeleteEntry} />
           ))}
         </section>
       )}
@@ -261,7 +274,7 @@ type EntryLike = {
   bySubject: { weekly_fast_subject_id: string | null; custom_label: string | null; intercessions: number; minutes: number }[];
 };
 
-function EntryCard({ entry: e }: { entry: EntryLike }) {
+function EntryCard({ entry: e, onDelete }: { entry: EntryLike; onDelete: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -293,6 +306,15 @@ function EntryCard({ entry: e }: { entry: EntryLike }) {
           <span className="text-slate-400 transition-transform" style={{ transform: open ? "rotate(180deg)" : "none" }}>⌄</span>
         </div>
       </button>
+      <div className="flex justify-end border-t border-slate-50 px-3 py-1.5">
+        <button
+          type="button"
+          onClick={() => onDelete(e.entryId)}
+          className="text-[10px] font-medium text-slate-400 hover:text-red-600 transition-colors"
+        >
+          Supprimer
+        </button>
+      </div>
       {open && e.bySubject.length > 0 && (
         <ul className="border-t border-slate-100 px-3 py-2 flex flex-col gap-1">
           {e.bySubject.map((s, i) => (

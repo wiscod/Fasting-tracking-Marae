@@ -220,8 +220,8 @@ export async function savePersonalFast(args: {
   id?: string;
   title: string;
   fastDate: string | null;
-  inTeamFast: boolean;
-  weeklyFastId: string | null;
+  fastEndDate: string | null;
+  fastType: string;
   globalHours: number | null;
   subjects: SubjectInput[];
 }): Promise<FastEntry> {
@@ -236,8 +236,10 @@ export async function savePersonalFast(args: {
       .update({
         title: args.title,
         fast_date: args.fastDate,
-        in_team_fast: args.inTeamFast,
-        weekly_fast_id: args.inTeamFast ? args.weeklyFastId : null,
+        fast_end_date: args.fastEndDate,
+        fast_type: args.fastType,
+        in_team_fast: false,
+        weekly_fast_id: null,
         global_hours: args.globalHours,
       })
       .eq("id", entryId);
@@ -250,8 +252,10 @@ export async function savePersonalFast(args: {
         kind: "personal",
         title: args.title,
         fast_date: args.fastDate,
-        in_team_fast: args.inTeamFast,
-        weekly_fast_id: args.inTeamFast ? args.weeklyFastId : null,
+        fast_end_date: args.fastEndDate,
+        fast_type: args.fastType,
+        in_team_fast: false,
+        weekly_fast_id: null,
         global_hours: args.globalHours,
       })
       .select("id")
@@ -281,10 +285,18 @@ export async function savePersonalFast(args: {
   return finalEntry.data as FastEntry;
 }
 
-export async function deletePersonalFast(id: string): Promise<void> {
+export async function deletePersonalFast(id: string, createdAt: string): Promise<void> {
+  const ageMs = Date.now() - new Date(createdAt).getTime();
+  if (ageMs > 7 * 24 * 60 * 60 * 1000) {
+    throw new Error("Suppression impossible après 7 jours.");
+  }
   const sb = getSupabaseBrowser();
   const { error } = await sb.from("fast_entries").delete().eq("id", id);
   if (error) throw error;
+}
+
+export function deleteEntryAdmin(entryId: string): Promise<void> {
+  return fetchAdmin<void>("deleteEntry", { entryId });
 }
 
 // ─── Admin types (data fetched via API service_role) ─────────────────────────

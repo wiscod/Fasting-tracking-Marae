@@ -25,6 +25,8 @@ export type FastEntry = {
   weekly_fast_id: string | null;
   title: string | null;
   fast_date: string | null;
+  fast_end_date: string | null;
+  fast_type: string;
   in_team_fast: boolean;
   global_hours: number | null;
   created_at: string;
