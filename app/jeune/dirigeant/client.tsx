@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { SubjectsEditor, SubjectRow } from "@/components/SubjectsEditor";
-import { isoWeeksInYear } from "@/lib/week";
+import { isoWeeksInYear, getIsoWeek } from "@/lib/week";
 import { TotalsBar } from "@/components/TotalsBar";
 import {
   getOrCreateWeeklyFast,
@@ -171,30 +171,27 @@ export function DirigentFastClient({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          aria-label="Semaine précédente"
-          onClick={() => navigateWeek(-1, year, week, setYear, setWeek)}
-          className="btn-secondary"
-        >
-          ←
-        </button>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-center gap-2">
+          <button type="button" aria-label="Semaine précédente" onClick={() => navigateWeek(-1, year, week, setYear, setWeek)} className="btn-secondary">←</button>
+          <select
+            value={week}
+            onChange={(e) => setWeek(Number(e.target.value))}
+            className="input w-28 text-sm"
+          >
+            {Array.from({ length: isoWeeksInYear(year) }, (_, i) => i + 1).map((w) => (
+              <option key={w} value={w}>Sem {w}</option>
+            ))}
+          </select>
+          <button type="button" aria-label="Semaine suivante" onClick={() => navigateWeek(1, year, week, setYear, setWeek)} className="btn-secondary">→</button>
+          <button type="button" onClick={() => { const { year: y, week: w } = getIsoWeek(); setYear(y); setWeek(w); }} className="btn-secondary text-xs">Aujourd'hui</button>
+        </div>
         <div className="text-center">
           <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>
-          <p className="text-lg font-semibold">Sem {week}</p>
           {weeklyFast?.title ? (
             <p className="text-xs text-slate-500">{weeklyFast.title}</p>
           ) : null}
         </div>
-        <button
-          type="button"
-          aria-label="Semaine suivante"
-          onClick={() => navigateWeek(1, year, week, setYear, setWeek)}
-          className="btn-secondary"
-        >
-          →
-        </button>
       </div>
 
       <div className="card flex flex-col gap-4">
