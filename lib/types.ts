@@ -46,7 +46,7 @@ export type Profile = {
   first_name: string;
   last_name: string | null;
   phone: string;
-  discipleship_maker: string;
+  discipleship_maker: string | null;
   is_dirigeant: boolean;
   created_at: string;
   updated_at: string;

@@ -24,7 +24,6 @@ export default function SignupPage() {
     setError(null);
     if (!firstName.trim()) return setError("Le prénom est obligatoire.");
     if (!phone) return setError("Le numéro de téléphone est invalide.");
-    if (!discipleshipMaker.trim()) return setError("Le nom du faiseur de disciple est obligatoire.");
 
     setLoading(true);
     const { data, error: signErr } = await sb.auth.signUp({
@@ -101,13 +100,12 @@ export default function SignupPage() {
           </div>
         </div>
         <div>
-          <label className="label">Faiseur de disciple *</label>
+          <label className="label">Faiseur de disciple (optionnel)</label>
           <input
             className="input mt-1"
             placeholder="Prénom et nom"
             value={discipleshipMaker}
             onChange={(e) => setDiscipleshipMaker(e.target.value)}
-            required
           />
           <p className="mt-1 text-xs text-slate-500">La personne qui te suit spirituellement.</p>
         </div>
