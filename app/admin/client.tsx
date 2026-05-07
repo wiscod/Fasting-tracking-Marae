@@ -9,11 +9,12 @@ import {
 } from "@/lib/data";
 import type { WeeklyParticipant } from "@/lib/data";
 import type { WeeklyFast, WeeklyFastSubject } from "@/lib/types";
-import { isoWeeksInYear } from "@/lib/week";
+import { isoWeeksInYear, getIsoWeek } from "@/lib/week";
 import { WeeklyStats } from "@/components/WeeklyStats";
 import { MonthlyView } from "@/components/admin/MonthlyView";
 import { YearlyView } from "@/components/admin/YearlyView";
 import { ProfilesView } from "@/components/admin/ProfilesView";
+import { WeekSelector } from "@/components/admin/WeekSelector";
 
 type Tab = "semaine" | "mois" | "annee" | "profils";
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
@@ -142,6 +143,12 @@ function WeekTab({
     setWeek(w);
   }
 
+  function handleToday() {
+    const { year: y, week: w } = getIsoWeek();
+    setYear(y);
+    setWeek(w);
+  }
+
   function updateLabel(i: number, value: string) {
     setLabels((prev) => prev.map((l, j) => (j === i ? value : l)));
   }
@@ -181,14 +188,17 @@ function WeekTab({
   return (
     <div className="flex flex-col gap-6">
       {/* Week navigator */}
-      <div className="flex items-center justify-between">
-        <button type="button" aria-label="Semaine précédente" onClick={() => navigate(-1)} className="btn-secondary">←</button>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-center gap-2">
+          <button type="button" aria-label="Semaine précédente" onClick={() => navigate(-1)} className="btn-secondary">←</button>
+          <WeekSelector year={year} week={week} onWeekChange={setWeek} />
+          <button type="button" aria-label="Semaine suivante" onClick={() => navigate(1)} className="btn-secondary">→</button>
+          <button type="button" onClick={handleToday} className="btn-secondary text-xs">Aujourd'hui</button>
+        </div>
         <div className="text-center">
           <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>
-          <p className="text-lg font-semibold">Sem {week}</p>
           {wf?.title && <p className="text-xs text-slate-500">{wf.title}</p>}
         </div>
-        <button type="button" aria-label="Semaine suivante" onClick={() => navigate(1)} className="btn-secondary">→</button>
       </div>
 
       {/* Fast type switcher */}
