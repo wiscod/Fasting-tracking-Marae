@@ -39,9 +39,9 @@ export function ProfilesView() {
       <p className="text-xs text-slate-500">{persons.length} personne{persons.length > 1 ? "s" : ""} · triées par importunités</p>
       {persons.map((p, i) => (
         <button
-          key={p.deviceId}
+          key={p.userId}
           type="button"
-          onClick={() => setSelected(p.deviceId)}
+          onClick={() => setSelected(p.userId)}
           className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm text-left hover:border-brand-400 transition-colors"
         >
           <div className="flex items-start justify-between gap-3">

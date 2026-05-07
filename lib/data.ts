@@ -1,17 +1,23 @@
-import { getSupabase } from "./supabase";
+import { getSupabaseBrowser } from "./supabaseBrowser";
 import type {
   FastEntry,
   FastEntrySubject,
-  FastKind,
   WeeklyFast,
   WeeklyFastSubject,
 } from "./types";
+
+async function getUserId(): Promise<string> {
+  const sb = getSupabaseBrowser();
+  const { data } = await sb.auth.getUser();
+  if (!data.user) throw new Error("Non authentifié");
+  return data.user.id;
+}
 
 export async function getOrCreateWeeklyFast(
   year: number,
   week: number,
 ): Promise<WeeklyFast> {
-  const sb = getSupabase();
+  const sb = getSupabaseBrowser();
   const existing = await sb
     .from("weekly_fasts")
     .select("*")
@@ -21,19 +27,24 @@ export async function getOrCreateWeeklyFast(
   if (existing.error) throw existing.error;
   if (existing.data) return existing.data as WeeklyFast;
 
-  const created = await sb
-    .from("weekly_fasts")
-    .insert({ year, week, title: `Jeûne d'équipe — Sem ${week}` })
-    .select("*")
-    .single();
-  if (created.error) throw created.error;
-  return created.data as WeeklyFast;
+  // Auth users can't insert weekly_fasts (RLS) — go through API route
+  const res = await fetch("/api/weekly-fast/ensure", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ year, week }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? "Impossible de créer la semaine");
+  }
+  const data = await res.json();
+  return data.weeklyFast as WeeklyFast;
 }
 
 export async function getWeeklyFastSubjects(
   weeklyFastId: string,
 ): Promise<WeeklyFastSubject[]> {
-  const sb = getSupabase();
+  const sb = getSupabaseBrowser();
   const { data, error } = await sb
     .from("weekly_fast_subjects")
     .select("*")
@@ -44,14 +55,14 @@ export async function getWeeklyFastSubjects(
 }
 
 export async function getTeamFastEntry(
-  deviceId: string,
   weeklyFastId: string,
 ): Promise<{ entry: FastEntry | null; subjects: FastEntrySubject[] }> {
-  const sb = getSupabase();
+  const sb = getSupabaseBrowser();
+  const userId = await getUserId();
   const { data: entry, error } = await sb
     .from("fast_entries")
     .select("*")
-    .eq("device_id", deviceId)
+    .eq("user_id", userId)
     .eq("weekly_fast_id", weeklyFastId)
     .eq("kind", "team")
     .maybeSingle();
@@ -79,19 +90,18 @@ export type SubjectInput = {
 };
 
 export async function saveTeamFastEntry(args: {
-  deviceId: string;
-  userName: string | null;
   weeklyFastId: string;
   globalHours: number | null;
   subjects: SubjectInput[];
 }): Promise<FastEntry> {
-  const sb = getSupabase();
+  const sb = getSupabaseBrowser();
+  const userId = await getUserId();
 
   let entryId: string;
   const existing = await sb
     .from("fast_entries")
     .select("id")
-    .eq("device_id", args.deviceId)
+    .eq("user_id", userId)
     .eq("weekly_fast_id", args.weeklyFastId)
     .eq("kind", "team")
     .maybeSingle();
@@ -101,18 +111,14 @@ export async function saveTeamFastEntry(args: {
     entryId = existing.data.id;
     const upd = await sb
       .from("fast_entries")
-      .update({
-        user_name: args.userName,
-        global_hours: args.globalHours,
-      })
+      .update({ global_hours: args.globalHours })
       .eq("id", entryId);
     if (upd.error) throw upd.error;
   } else {
     const ins = await sb
       .from("fast_entries")
       .insert({
-        device_id: args.deviceId,
-        user_name: args.userName,
+        user_id: userId,
         kind: "team",
         weekly_fast_id: args.weeklyFastId,
         in_team_fast: true,
@@ -145,25 +151,46 @@ export async function saveTeamFastEntry(args: {
   return finalEntry.data as FastEntry;
 }
 
-export async function listPersonalFasts(
-  deviceId: string,
-): Promise<FastEntry[]> {
-  const sb = getSupabase();
-  const { data, error } = await sb
+// Liste unifiée : tous les jeûnes (équipe + perso) de l'utilisateur
+export async function listMyFasts(): Promise<
+  (FastEntry & { weekLabel: string | null })[]
+> {
+  const sb = getSupabaseBrowser();
+  const userId = await getUserId();
+  const { data: entries, error } = await sb
     .from("fast_entries")
     .select("*")
-    .eq("device_id", deviceId)
-    .eq("kind", "personal")
+    .eq("user_id", userId)
     .order("fast_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as FastEntry[];
+
+  const cast = (entries ?? []) as FastEntry[];
+  const wfIds = [...new Set(cast.map((e) => e.weekly_fast_id).filter(Boolean) as string[])];
+  let wfMap = new Map<string, { year: number; week: number }>();
+  if (wfIds.length > 0) {
+    const { data: wfs } = await sb
+      .from("weekly_fasts")
+      .select("id, year, week")
+      .in("id", wfIds);
+    wfMap = new Map((wfs ?? []).map((w: { id: string; year: number; week: number }) => [w.id, { year: w.year, week: w.week }]));
+  }
+
+  return cast.map((e) => ({
+    ...e,
+    weekLabel: e.weekly_fast_id
+      ? (() => {
+          const wf = wfMap.get(e.weekly_fast_id!);
+          return wf ? `Sem ${wf.week} ${wf.year}` : null;
+        })()
+      : null,
+  }));
 }
 
 export async function getPersonalFast(
   id: string,
 ): Promise<{ entry: FastEntry | null; subjects: FastEntrySubject[] }> {
-  const sb = getSupabase();
+  const sb = getSupabaseBrowser();
   const { data: entry, error } = await sb
     .from("fast_entries")
     .select("*")
@@ -186,8 +213,6 @@ export async function getPersonalFast(
 
 export async function savePersonalFast(args: {
   id?: string;
-  deviceId: string;
-  userName: string | null;
   title: string;
   fastDate: string | null;
   inTeamFast: boolean;
@@ -195,7 +220,8 @@ export async function savePersonalFast(args: {
   globalHours: number | null;
   subjects: SubjectInput[];
 }): Promise<FastEntry> {
-  const sb = getSupabase();
+  const sb = getSupabaseBrowser();
+  const userId = await getUserId();
   let entryId: string;
 
   if (args.id) {
@@ -203,7 +229,6 @@ export async function savePersonalFast(args: {
     const upd = await sb
       .from("fast_entries")
       .update({
-        user_name: args.userName,
         title: args.title,
         fast_date: args.fastDate,
         in_team_fast: args.inTeamFast,
@@ -216,8 +241,7 @@ export async function savePersonalFast(args: {
     const ins = await sb
       .from("fast_entries")
       .insert({
-        device_id: args.deviceId,
-        user_name: args.userName,
+        user_id: userId,
         kind: "personal",
         title: args.title,
         fast_date: args.fastDate,
@@ -253,16 +277,18 @@ export async function savePersonalFast(args: {
 }
 
 export async function deletePersonalFast(id: string): Promise<void> {
-  const sb = getSupabase();
+  const sb = getSupabaseBrowser();
   const { error } = await sb.from("fast_entries").delete().eq("id", id);
   if (error) throw error;
 }
 
+// ─── Admin types (data fetched via API service_role) ─────────────────────────
+
 export type WeeklyParticipant = {
   entryId: string;
-  deviceId: string;
+  userId: string;
   userName: string | null;
-  kind: FastKind;
+  kind: "team" | "personal";
   fastDate: string | null;
   globalMinutes: number | null;
   updatedAt: string;
@@ -276,72 +302,10 @@ export type WeeklyParticipant = {
   }[];
 };
 
-export async function getWeeklyParticipants(
-  weeklyFastId: string,
-): Promise<WeeklyParticipant[]> {
-  const sb = getSupabase();
-  const { data: entries, error } = await sb
-    .from("fast_entries")
-    .select("*")
-    .eq("weekly_fast_id", weeklyFastId)
-    .order("updated_at", { ascending: false });
-  if (error) throw error;
-  if (!entries || entries.length === 0) return [];
-
-  const ids = (entries as FastEntry[]).map((e) => e.id);
-  const { data: subs, error: subErr } = await sb
-    .from("fast_entry_subjects")
-    .select("*")
-    .in("fast_entry_id", ids);
-  if (subErr) throw subErr;
-
-  const subsByEntry = new Map<string, FastEntrySubject[]>();
-  for (const s of (subs ?? []) as FastEntrySubject[]) {
-    const list = subsByEntry.get(s.fast_entry_id) ?? [];
-    list.push(s);
-    subsByEntry.set(s.fast_entry_id, list);
-  }
-
-  return (entries as FastEntry[]).map((e) => {
-    const entrySubs = subsByEntry.get(e.id) ?? [];
-    const totalIntercessions = entrySubs.reduce(
-      (acc, s) => acc + (s.intercessions || 0),
-      0,
-    );
-    const perSubjectMinutes = entrySubs.reduce(
-      (acc, s) => acc + Number(s.hours || 0),
-      0,
-    );
-    const globalMinutes = e.global_hours != null ? Number(e.global_hours) : null;
-    const totalMinutes =
-      globalMinutes != null && Number.isFinite(globalMinutes)
-        ? globalMinutes
-        : perSubjectMinutes;
-    return {
-      entryId: e.id,
-      deviceId: e.device_id,
-      userName: e.user_name,
-      kind: e.kind,
-      fastDate: e.fast_date,
-      globalMinutes,
-      updatedAt: e.updated_at,
-      totalIntercessions,
-      totalMinutes,
-      bySubject: entrySubs.map((s) => ({
-        weekly_fast_subject_id: s.weekly_fast_subject_id,
-        custom_label: s.custom_label,
-        intercessions: s.intercessions || 0,
-        minutes: Number(s.hours || 0),
-      })),
-    };
-  });
-}
-
-// ─── Person summary ──────────────────────────────────────────────────────────
-
 export type PersonSummary = {
-  deviceId: string;
+  userId: string;
   userName: string | null;
+  phone: string | null;
   totalFasts: number;
   totalTeamFasts: number;
   totalPersonalFasts: number;
@@ -356,167 +320,6 @@ export type PersonHistory = {
   personalSubjects: string[];
 };
 
-export async function getAllPersons(): Promise<PersonSummary[]> {
-  const sb = getSupabase();
-  const { data: entries, error } = await sb
-    .from("fast_entries")
-    .select("id, device_id, user_name, kind, global_hours, updated_at")
-    .order("updated_at", { ascending: false });
-  if (error) throw error;
-  if (!entries || entries.length === 0) return [];
-
-  const ids = (entries as FastEntry[]).map((e) => e.id);
-  const { data: subs } = await sb
-    .from("fast_entry_subjects")
-    .select("fast_entry_id, intercessions, hours")
-    .in("fast_entry_id", ids);
-
-  const subsByEntry = new Map<string, { intercessions: number; hours: number }[]>();
-  for (const s of (subs ?? []) as FastEntrySubject[]) {
-    const list = subsByEntry.get(s.fast_entry_id) ?? [];
-    list.push(s);
-    subsByEntry.set(s.fast_entry_id, list);
-  }
-
-  const byDevice = new Map<string, PersonSummary>();
-  for (const e of entries as FastEntry[]) {
-    const entrySubs = subsByEntry.get(e.id) ?? [];
-    const imp = entrySubs.reduce((a, s) => a + (s.intercessions || 0), 0);
-    const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
-    const gm = e.global_hours != null ? Number(e.global_hours) : null;
-    const min = gm != null && Number.isFinite(gm) ? gm : perSub;
-
-    const existing = byDevice.get(e.device_id);
-    if (existing) {
-      existing.totalFasts += 1;
-      existing.totalTeamFasts += e.kind === "team" ? 1 : 0;
-      existing.totalPersonalFasts += e.kind === "personal" ? 1 : 0;
-      existing.totalImportunites += imp;
-      existing.totalMinutes += min;
-      if (e.updated_at > existing.lastSeen) {
-        existing.lastSeen = e.updated_at;
-        if (e.user_name) existing.userName = e.user_name;
-      }
-    } else {
-      byDevice.set(e.device_id, {
-        deviceId: e.device_id,
-        userName: e.user_name,
-        totalFasts: 1,
-        totalTeamFasts: e.kind === "team" ? 1 : 0,
-        totalPersonalFasts: e.kind === "personal" ? 1 : 0,
-        totalImportunites: imp,
-        totalMinutes: min,
-        lastSeen: e.updated_at,
-      });
-    }
-  }
-
-  return [...byDevice.values()].sort(
-    (a, b) => b.totalImportunites - a.totalImportunites,
-  );
-}
-
-export async function getPersonHistory(deviceId: string): Promise<PersonHistory> {
-  const sb = getSupabase();
-  const { data: entries, error } = await sb
-    .from("fast_entries")
-    .select("*")
-    .eq("device_id", deviceId)
-    .order("fast_date", { ascending: false, nullsFirst: false })
-    .order("updated_at", { ascending: false });
-  if (error) throw error;
-
-  const castEntries = (entries ?? []) as FastEntry[];
-  const ids = castEntries.map((e) => e.id);
-
-  const [subsRes, wfRes] = await Promise.all([
-    ids.length
-      ? sb.from("fast_entry_subjects").select("*").in("fast_entry_id", ids)
-      : { data: [], error: null },
-    sb.from("weekly_fasts").select("id, year, week"),
-  ]);
-  if (subsRes.error) throw subsRes.error;
-
-  const wfMap = new Map<string, { year: number; week: number }>();
-  for (const wf of (wfRes.data ?? []) as WeeklyFast[]) {
-    wfMap.set(wf.id, { year: wf.year, week: wf.week });
-  }
-
-  const subsByEntry = new Map<string, FastEntrySubject[]>();
-  for (const s of (subsRes.data ?? []) as FastEntrySubject[]) {
-    const list = subsByEntry.get(s.fast_entry_id) ?? [];
-    list.push(s);
-    subsByEntry.set(s.fast_entry_id, list);
-  }
-
-  let totalImportunites = 0;
-  let totalMinutes = 0;
-  let totalTeamFasts = 0;
-  let totalPersonalFasts = 0;
-  const personalSubjectsSet = new Set<string>();
-
-  const mappedEntries = castEntries.map((e) => {
-    const entrySubs = subsByEntry.get(e.id) ?? [];
-    const imp = entrySubs.reduce((a, s) => a + (s.intercessions || 0), 0);
-    const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
-    const gm = e.global_hours != null ? Number(e.global_hours) : null;
-    const min = gm != null && Number.isFinite(gm) ? gm : perSub;
-
-    totalImportunites += imp;
-    totalMinutes += min;
-    if (e.kind === "team") totalTeamFasts++;
-    else {
-      totalPersonalFasts++;
-      for (const s of entrySubs) {
-        if (s.custom_label?.trim()) personalSubjectsSet.add(s.custom_label.trim());
-      }
-    }
-
-    const wf = e.weekly_fast_id ? wfMap.get(e.weekly_fast_id) : null;
-    const weekLabel = wf ? `Sem ${wf.week} (${wf.year})` : null;
-
-    return {
-      entryId: e.id,
-      deviceId: e.device_id,
-      userName: e.user_name,
-      kind: e.kind,
-      fastDate: e.fast_date,
-      globalMinutes: gm,
-      updatedAt: e.updated_at,
-      totalIntercessions: imp,
-      totalMinutes: min,
-      weekLabel,
-      weeklyFastId: e.weekly_fast_id,
-      bySubject: entrySubs.map((s) => ({
-        weekly_fast_subject_id: s.weekly_fast_subject_id,
-        custom_label: s.custom_label,
-        intercessions: s.intercessions || 0,
-        minutes: Number(s.hours || 0),
-      })),
-    };
-  });
-
-  const lastEntry = castEntries[0];
-  const person: PersonSummary = {
-    deviceId,
-    userName: castEntries.find((e) => e.user_name)?.user_name ?? null,
-    totalFasts: castEntries.length,
-    totalTeamFasts,
-    totalPersonalFasts,
-    totalImportunites,
-    totalMinutes,
-    lastSeen: lastEntry?.updated_at ?? "",
-  };
-
-  return {
-    person,
-    entries: mappedEntries,
-    personalSubjects: [...personalSubjectsSet],
-  };
-}
-
-// ─── Weekly aggregates for charts ────────────────────────────────────────────
-
 export type WeeklyAggregate = {
   year: number;
   week: number;
@@ -527,97 +330,41 @@ export type WeeklyAggregate = {
   totalMinutes: number;
 };
 
-export async function getWeeklyAggregates(
+async function fetchAdmin<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
+  const res = await fetch("/api/admin/data", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...body }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? `HTTP ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
+export function getWeeklyParticipants(weeklyFastId: string): Promise<WeeklyParticipant[]> {
+  return fetchAdmin<WeeklyParticipant[]>("getWeeklyParticipants", { weeklyFastId });
+}
+
+export function getAllPersons(): Promise<PersonSummary[]> {
+  return fetchAdmin<PersonSummary[]>("getAllPersons");
+}
+
+export function getPersonHistory(userId: string): Promise<PersonHistory> {
+  return fetchAdmin<PersonHistory>("getPersonHistory", { userId });
+}
+
+export function getWeeklyAggregates(
   fromYear: number,
   fromWeek: number,
   toYear: number,
   toWeek: number,
 ): Promise<WeeklyAggregate[]> {
-  const sb = getSupabase();
-
-  // Fetch all weekly_fasts in range
-  const { data: wfs, error: wfErr } = await sb
-    .from("weekly_fasts")
-    .select("id, year, week");
-  if (wfErr) throw wfErr;
-
-  const inRange = (y: number, w: number) => {
-    const from = fromYear * 100 + fromWeek;
-    const to = toYear * 100 + toWeek;
-    const cur = y * 100 + w;
-    return cur >= from && cur <= to;
-  };
-
-  const wfsInRange = ((wfs ?? []) as WeeklyFast[]).filter((wf) =>
-    inRange(wf.year, wf.week),
-  );
-  const wfIds = wfsInRange.map((wf) => wf.id);
-  const wfById = new Map(wfsInRange.map((wf) => [wf.id, wf]));
-
-  // Fetch all entries linked to these weekly_fasts
-  const { data: entries, error: eErr } = await sb
-    .from("fast_entries")
-    .select("id, device_id, kind, global_hours, weekly_fast_id, fast_date")
-    .in("weekly_fast_id", wfIds.length ? wfIds : ["none"]);
-  if (eErr) throw eErr;
-
-  const castEntries = (entries ?? []) as FastEntry[];
-  const ids = castEntries.map((e) => e.id);
-  const { data: subs } = ids.length
-    ? await sb
-        .from("fast_entry_subjects")
-        .select("fast_entry_id, intercessions, hours")
-        .in("fast_entry_id", ids)
-    : { data: [] };
-
-  const subsByEntry = new Map<string, { intercessions: number; hours: number }[]>();
-  for (const s of (subs ?? []) as FastEntrySubject[]) {
-    const list = subsByEntry.get(s.fast_entry_id) ?? [];
-    list.push(s);
-    subsByEntry.set(s.fast_entry_id, list);
-  }
-
-  // Build aggregates keyed by "year-week"
-  const aggMap = new Map<string, WeeklyAggregate>();
-
-  // Init slots for all weeks in range
-  for (const wf of wfsInRange) {
-    const key = `${wf.year}-${wf.week}`;
-    if (!aggMap.has(key)) {
-      aggMap.set(key, {
-        year: wf.year,
-        week: wf.week,
-        label: `S${wf.week}`,
-        teamCount: 0,
-        personalCount: 0,
-        totalImportunites: 0,
-        totalMinutes: 0,
-      });
-    }
-  }
-
-  for (const e of castEntries) {
-    const wf = e.weekly_fast_id ? wfById.get(e.weekly_fast_id) : null;
-    if (!wf) continue;
-    const key = `${wf.year}-${wf.week}`;
-    const agg = aggMap.get(key);
-    if (!agg) continue;
-
-    const entrySubs = subsByEntry.get(e.id) ?? [];
-    const imp = entrySubs.reduce((a, s) => a + (s.intercessions || 0), 0);
-    const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
-    const gm = e.global_hours != null ? Number(e.global_hours) : null;
-    const min = gm != null && Number.isFinite(gm) ? gm : perSub;
-
-    if (e.kind === "team") agg.teamCount++;
-    else agg.personalCount++;
-    agg.totalImportunites += imp;
-    agg.totalMinutes += min;
-  }
-
-  return [...aggMap.values()].sort((a, b) => {
-    const ak = a.year * 100 + a.week;
-    const bk = b.year * 100 + b.week;
-    return ak - bk;
+  return fetchAdmin<WeeklyAggregate[]>("getWeeklyAggregates", {
+    fromYear,
+    fromWeek,
+    toYear,
+    toWeek,
   });
 }

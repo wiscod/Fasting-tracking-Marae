@@ -19,8 +19,7 @@ export type FastKind = "team" | "personal";
 
 export type FastEntry = {
   id: string;
-  device_id: string;
-  user_name: string | null;
+  user_id: string;
   kind: FastKind;
   weekly_fast_id: string | null;
   title: string | null;
@@ -39,4 +38,13 @@ export type FastEntrySubject = {
   intercessions: number;
   hours: number;
   position: number;
+};
+
+export type Profile = {
+  id: string;
+  first_name: string;
+  last_name: string | null;
+  phone: string;
+  created_at: string;
+  updated_at: string;
 };

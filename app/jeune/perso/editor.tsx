@@ -11,7 +11,6 @@ import {
   getWeeklyFastSubjects,
   savePersonalFast,
 } from "@/lib/data";
-import { getDeviceId, getStoredName, setStoredName } from "@/lib/deviceId";
 import { getIsoWeek } from "@/lib/week";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
@@ -30,18 +29,14 @@ export function PersonalEditor({
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [title, setTitle] = useState("");
   const [fastDate, setFastDate] = useState(today);
-  const [name, setName] = useState("");
   const [globalHours, setGlobalHours] = useState("");
   const [inTeamFast, setInTeamFast] = useState(false);
   const [weeklyFastId, setWeeklyFastId] = useState<string | null>(null);
   const [rows, setRows] = useState<SubjectRow[]>([]);
 
   useEffect(() => {
-    setName(getStoredName());
     if (mode === "create") {
-      setRows([
-        emptyRow(),
-      ]);
+      setRows([emptyRow()]);
     }
   }, [mode]);
 
@@ -131,8 +126,6 @@ export function PersonalEditor({
     setStatus("saving");
     setErrorMsg(null);
     try {
-      const trimmedName = name.trim();
-      if (trimmedName) setStoredName(trimmedName);
       const subjects = rows
         .filter((r) => r.label.trim() !== "" || r.weekly_fast_subject_id)
         .map((r, i) => ({
@@ -145,8 +138,6 @@ export function PersonalEditor({
       const gh = globalHours.trim() === "" ? null : Number(globalHours);
       const saved = await savePersonalFast({
         id: mode === "edit" ? entryId : undefined,
-        deviceId: getDeviceId(),
-        userName: trimmedName || null,
         title: title.trim() || "Jeûne personnel",
         fastDate: fastDate || null,
         inTeamFast,
@@ -200,15 +191,6 @@ export function PersonalEditor({
             className="input mt-1"
             value={fastDate}
             onChange={(e) => setFastDate(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label">Ton prénom (optionnel)</label>
-          <input
-            className="input mt-1"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Pour t'identifier dans les stats"
           />
         </div>
         <label className="flex items-center gap-2 text-sm">

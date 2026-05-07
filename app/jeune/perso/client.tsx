@@ -2,25 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { listPersonalFasts } from "@/lib/data";
-import { getDeviceId } from "@/lib/deviceId";
+import { listMyFasts } from "@/lib/data";
 import type { FastEntry } from "@/lib/types";
 
+type Item = FastEntry & { weekLabel: string | null };
+
 export function PersonalListClient() {
-  const [items, setItems] = useState<FastEntry[] | null>(null);
+  const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const deviceId = getDeviceId();
-        const data = await listPersonalFasts(deviceId);
-        setItems(data);
-      } catch (e: unknown) {
-        setError(messageOf(e));
-      }
-    }
-    load();
+    listMyFasts()
+      .then(setItems)
+      .catch((e: unknown) => setError(messageOf(e)));
   }, []);
 
   if (error) {
@@ -41,27 +35,39 @@ export function PersonalListClient() {
       {items === null ? (
         <p className="text-sm text-slate-500">Chargement…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          Aucun jeûne personnel pour l'instant.
-        </p>
+        <p className="text-sm text-slate-500">Aucun jeûne pour l'instant.</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {items.map((it) => (
-            <li key={it.id}>
-              <Link
-                href={`/jeune/perso/${it.id}`}
-                className="card flex flex-col gap-1 hover:border-brand-500"
-              >
-                <span className="text-sm font-semibold">
-                  {it.title || "Jeûne sans titre"}
-                </span>
-                <span className="text-xs text-slate-500">
-                  {it.fast_date ?? formatDate(it.created_at)}
-                  {it.in_team_fast ? " · dans le cadre du jeûne d'équipe" : ""}
-                </span>
-              </Link>
-            </li>
-          ))}
+          {items.map((it) => {
+            const isTeam = it.kind === "team";
+            const href = isTeam
+              ? "/jeune/equipe"
+              : `/jeune/perso/${it.id}`;
+            return (
+              <li key={it.id}>
+                <Link href={href} className="card flex flex-col gap-1 hover:border-brand-500">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                        isTeam ? "bg-brand-50 text-brand-700" : "bg-green-50 text-green-700"
+                      }`}
+                    >
+                      {isTeam ? "Équipe" : "Perso"}
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {isTeam
+                        ? it.weekLabel ?? "Jeûne d'équipe"
+                        : it.title || "Jeûne sans titre"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-500">
+                    {it.fast_date ?? formatDate(it.created_at)}
+                    {!isTeam && it.in_team_fast ? " · dans le cadre du jeûne d'équipe" : ""}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -69,11 +75,8 @@ export function PersonalListClient() {
 }
 
 function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString("fr-FR");
-  } catch {
-    return iso;
-  }
+  try { return new Date(iso).toLocaleDateString("fr-FR"); }
+  catch { return iso; }
 }
 
 function messageOf(e: unknown): string {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabase } from "@/lib/supabase";
+import { getSupabaseService } from "@/lib/supabaseServer";
 
 type Payload = {
   weeklyFastId: string;
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Payload invalide" }, { status: 400 });
   }
 
-  const sb = getSupabase();
+  const sb = getSupabaseService();
 
   const { error: delError } = await sb
     .from("weekly_fast_subjects")

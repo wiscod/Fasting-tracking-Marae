@@ -11,7 +11,6 @@ import {
   getWeeklyFastSubjects,
   saveTeamFastEntry,
 } from "@/lib/data";
-import { getDeviceId, getStoredName, setStoredName } from "@/lib/deviceId";
 import type { WeeklyFast, WeeklyFastSubject } from "@/lib/types";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
@@ -32,11 +31,6 @@ export function TeamFastClient({
   const [predefined, setPredefined] = useState<WeeklyFastSubject[]>([]);
   const [rows, setRows] = useState<SubjectRow[]>([]);
   const [globalHours, setGlobalHours] = useState<string>("");
-  const [name, setName] = useState<string>("");
-
-  useEffect(() => {
-    setName(getStoredName());
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,8 +40,7 @@ export function TeamFastClient({
       try {
         const wf = await getOrCreateWeeklyFast(year, week);
         const subs = await getWeeklyFastSubjects(wf.id);
-        const deviceId = getDeviceId();
-        const { entry, subjects } = await getTeamFastEntry(deviceId, wf.id);
+        const { entry, subjects } = await getTeamFastEntry(wf.id);
         if (cancelled) return;
 
         setWeeklyFast(wf);
@@ -124,10 +117,6 @@ export function TeamFastClient({
     setStatus("saving");
     setErrorMsg(null);
     try {
-      const deviceId = getDeviceId();
-      const trimmedName = name.trim();
-      if (trimmedName) setStoredName(trimmedName);
-
       const subjects = rows
         .filter((r) => r.editable ? (r.label.trim() !== "") : true)
         .map((r, i) => ({
@@ -140,8 +129,6 @@ export function TeamFastClient({
 
       const gh = globalHours.trim() === "" ? null : Number(globalHours);
       await saveTeamFastEntry({
-        deviceId,
-        userName: trimmedName || null,
         weeklyFastId: weeklyFast.id,
         globalHours: gh != null && Number.isFinite(gh) ? gh : null,
         subjects,
@@ -208,16 +195,6 @@ export function TeamFastClient({
         >
           →
         </button>
-      </div>
-
-      <div>
-        <label className="label">Ton prénom (optionnel)</label>
-        <input
-          className="input mt-1"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Pour t'identifier dans les stats"
-        />
       </div>
 
       <div className="card flex flex-col gap-4">
