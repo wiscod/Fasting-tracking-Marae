@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -40,9 +41,12 @@ export default function LoginPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-bold">Connexion</h1>
-        <p className="mt-1 text-sm text-slate-500">Connecte-toi pour accéder à tes jeûnes.</p>
+      <div className="flex flex-col items-center gap-3">
+        <Image src="/logo.svg" alt="Logo" width={64} height={64} priority />
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Connexion</h1>
+          <p className="mt-1 text-sm text-slate-500">Connecte-toi pour accéder à tes jeûnes.</p>
+        </div>
       </div>
 
       <button type="button" onClick={handleGoogle} className="btn-secondary flex items-center justify-center gap-2">

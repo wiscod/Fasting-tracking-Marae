@@ -1,0 +1,20 @@
+<svg width="160" height="160" viewBox="54 98 124 124" role="img" xmlns="http://www.w3.org/2000/svg">
+  <title>Fast tracking icon</title>
+  <defs>
+    <clipPath id="moon-clip">
+      <circle cx="116" cy="160" r="62"/>
+    </clipPath>
+  </defs>
+
+  <rect width="160" height="160" x="54" y="98" fill="white"/>
+
+  <circle cx="116" cy="160" r="62" fill="#534AB7"/>
+  <circle cx="143" cy="143" r="52" fill="#26215C" clip-path="url(#moon-clip)"/>
+
+  <ellipse cx="97" cy="183" rx="7" ry="19" fill="#7F77DD" transform="rotate(-15 97 183)"/>
+  <ellipse cx="110" cy="172" rx="5" ry="13" fill="#AFA9EC" transform="rotate(-15 110 172)"/>
+
+  <circle cx="88" cy="143" r="3.5" fill="#AFA9EC" opacity="0.6"/>
+  <circle cx="76" cy="162" r="2.5" fill="#AFA9EC" opacity="0.4"/>
+  <circle cx="95" cy="130" r="2" fill="#AFA9EC" opacity="0.5"/>
+</svg>

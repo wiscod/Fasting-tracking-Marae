@@ -4,6 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Jeûnes",
   description: "Enregistre tes jeûnes et tes sujets de prière",
+  icons: { icon: "/logo.svg", apple: "/logo.svg" },
 };
 
 export const viewport: Viewport = {

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export function Header({
@@ -16,9 +17,11 @@ export function Header({
         >
           ← {back.label ?? "Retour"}
         </Link>
-      ) : null}
+      ) : (
+        <Image src="/logo.svg" alt="" width={28} height={28} priority />
+      )}
       <h1 className="ml-auto mr-auto text-base font-semibold">{title}</h1>
-      {back ? <span className="w-12" /> : null}
+      {back ? <span className="w-12" /> : <span className="w-7" />}
     </header>
   );
 }

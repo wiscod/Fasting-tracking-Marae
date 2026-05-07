@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -79,9 +80,12 @@ export default function SignupPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 px-4 py-8">
-      <div>
-        <h1 className="text-2xl font-bold">Créer un compte</h1>
-        <p className="mt-1 text-sm text-slate-500">Inscris-toi pour suivre tes jeûnes.</p>
+      <div className="flex flex-col items-center gap-3">
+        <Image src="/logo.svg" alt="Logo" width={64} height={64} priority />
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Créer un compte</h1>
+          <p className="mt-1 text-sm text-slate-500">Inscris-toi pour suivre tes jeûnes.</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
