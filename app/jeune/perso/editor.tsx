@@ -79,10 +79,11 @@ export function PersonalEditor({
   }, [mode, entryId, today]);
 
   const durationDays = useMemo(() => {
-    if (!fastDate || !fastEndDate) return null;
+    if (!fastDate) return null;
+    if (!fastEndDate || fastEndDate === fastDate) return 1;
     const diff = new Date(fastEndDate).getTime() - new Date(fastDate).getTime();
     const days = Math.round(diff / 86400_000);
-    return days > 0 ? days + 1 : null; // inclusive count
+    return days > 0 ? days + 1 : 1; // inclusive count, minimum 1
   }, [fastDate, fastEndDate]);
 
   const totals = useMemo(() => {
@@ -228,7 +229,7 @@ export function PersonalEditor({
         {durationDays !== null ? (
           <p className="text-center text-xs font-medium text-brand-600">{durationDays} jour{durationDays > 1 ? "s" : ""}</p>
         ) : (
-          <p className="text-center text-xs text-slate-400">Sélectionne une date de fin pour voir la durée</p>
+          <p className="text-center text-xs text-slate-400">Sélectionne une date de début</p>
         )}
       </div>
 
