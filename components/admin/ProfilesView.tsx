@@ -77,7 +77,7 @@ export function ProfilesView() {
             </div>
           </div>
           <p className="mt-2 text-[10px] text-slate-400">
-            Dernière activité : {formatRelative(p.lastSeen)}
+            {p.lastSeen ? `Dernière activité : ${formatRelative(p.lastSeen)}` : "Aucune activité"}
           </p>
         </button>
       ))}

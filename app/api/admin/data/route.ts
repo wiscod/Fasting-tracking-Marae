@@ -87,6 +87,13 @@ export async function POST(req: Request) {
   }
 
   if (body.action === "getAllPersons") {
+    // Start from profiles so all registered users appear, even with no fasts
+    const { data: allProfiles, error: profErr } = await sb
+      .from("profiles")
+      .select("id, first_name, last_name, phone, is_dirigeant")
+      .order("created_at", { ascending: true });
+    if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
+
     const { data: entries, error } = await sb
       .from("fast_entries")
       .select("id, user_id, kind, global_hours, updated_at")
@@ -103,18 +110,11 @@ export async function POST(req: Request) {
       list.push(s);
       subsByEntry.set(s.fast_entry_id, list);
     }
-    const profiles = await loadProfiles([...new Set(cast.map((e) => e.user_id))]);
-    const byUser = new Map<string, {
-      userId: string;
-      userName: string | null;
-      phone: string | null;
-      isDirigent: boolean;
-      totalFasts: number;
-      totalTeamFasts: number;
-      totalPersonalFasts: number;
-      totalImportunites: number;
-      totalMinutes: number;
-      lastSeen: string;
+
+    // Aggregate fast stats per user
+    const statsByUser = new Map<string, {
+      totalFasts: number; totalTeamFasts: number; totalPersonalFasts: number;
+      totalImportunites: number; totalMinutes: number; lastSeen: string;
     }>();
     for (const e of cast) {
       const entrySubs = subsByEntry.get(e.id) ?? [];
@@ -122,7 +122,7 @@ export async function POST(req: Request) {
       const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
       const gm = e.global_hours != null ? Number(e.global_hours) : null;
       const min = gm != null && Number.isFinite(gm) ? gm : perSub;
-      const existing = byUser.get(e.user_id);
+      const existing = statsByUser.get(e.user_id);
       if (existing) {
         existing.totalFasts += 1;
         existing.totalTeamFasts += e.kind === "team" ? 1 : 0;
@@ -131,12 +131,7 @@ export async function POST(req: Request) {
         existing.totalMinutes += min;
         if (e.updated_at > existing.lastSeen) existing.lastSeen = e.updated_at;
       } else {
-        const p = profiles.get(e.user_id);
-        byUser.set(e.user_id, {
-          userId: e.user_id,
-          userName: fullName(p),
-          phone: p?.phone ?? null,
-          isDirigent: p?.is_dirigeant ?? false,
+        statsByUser.set(e.user_id, {
           totalFasts: 1,
           totalTeamFasts: e.kind === "team" ? 1 : 0,
           totalPersonalFasts: e.kind === "personal" ? 1 : 0,
@@ -146,7 +141,24 @@ export async function POST(req: Request) {
         });
       }
     }
-    return NextResponse.json([...byUser.values()].sort((a, b) => b.totalImportunites - a.totalImportunites));
+
+    const result = (allProfiles ?? []).map((p: { id: string; first_name: string; last_name: string | null; phone: string; is_dirigeant: boolean }) => {
+      const stats = statsByUser.get(p.id);
+      return {
+        userId: p.id,
+        userName: fullName(p),
+        phone: p.phone,
+        isDirigent: p.is_dirigeant,
+        totalFasts: stats?.totalFasts ?? 0,
+        totalTeamFasts: stats?.totalTeamFasts ?? 0,
+        totalPersonalFasts: stats?.totalPersonalFasts ?? 0,
+        totalImportunites: stats?.totalImportunites ?? 0,
+        totalMinutes: stats?.totalMinutes ?? 0,
+        lastSeen: stats?.lastSeen ?? "",
+      };
+    });
+
+    return NextResponse.json(result.sort((a, b) => b.totalImportunites - a.totalImportunites));
   }
 
   if (body.action === "getPersonHistory") {
