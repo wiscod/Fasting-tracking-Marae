@@ -1,5 +1,6 @@
 import { getSupabaseBrowser } from "./supabaseBrowser";
 import type {
+  Croisade,
   FastEntry,
   FastEntrySubject,
   WeeklyFast,
@@ -361,8 +362,8 @@ export type WeeklyAggregate = {
   totalMinutes: number;
 };
 
-async function fetchAdmin<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
-  const res = await fetch("/api/admin/data", {
+async function fetchAdmin<T>(action: string, body: Record<string, unknown> = {}, endpoint = "/api/admin/data"): Promise<T> {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, ...body }),
@@ -372,6 +373,10 @@ async function fetchAdmin<T>(action: string, body: Record<string, unknown> = {})
     throw new Error(err.error ?? `HTTP ${res.status}`);
   }
   return (await res.json()) as T;
+}
+
+function fetchAdminCroisades<T>(action: string, body: Record<string, unknown> = {}): Promise<T> {
+  return fetchAdmin<T>(action, body, "/api/admin/croisades");
 }
 
 export function getWeeklyParticipants(weeklyFastId: string): Promise<WeeklyParticipant[]> {
@@ -398,4 +403,69 @@ export function getWeeklyAggregates(
     toYear,
     toWeek,
   });
+}
+
+// ─── Croisades ────────────────────────────────────────────────────────────────
+
+export type CroisadeStats = {
+  totalEntries: number;
+  totalMinutes: number;
+  totalIntercessions: number;
+  participants: number;
+};
+
+export async function getActiveCroisade(
+  date?: string,
+  isDirigent = false,
+): Promise<Croisade | null> {
+  const sb = getSupabaseBrowser();
+  const today = date ?? new Date().toISOString().slice(0, 10);
+  const { data, error } = await sb
+    .from("croisades")
+    .select("*")
+    .eq("is_dirigeant", isDirigent)
+    .lte("start_date", today)
+    .gte("end_date", today)
+    .eq("is_active", true)
+    .order("start_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Croisade | null;
+}
+
+export function getAllCroisades(): Promise<Croisade[]> {
+  return fetchAdminCroisades<Croisade[]>("getAllCroisades");
+}
+
+export function createCroisade(args: {
+  name: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  is_dirigeant: boolean;
+}): Promise<Croisade> {
+  return fetchAdminCroisades<Croisade>("createCroisade", args as unknown as Record<string, unknown>);
+}
+
+export function updateCroisade(args: {
+  id: string;
+  name: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+}): Promise<Croisade> {
+  return fetchAdminCroisades<Croisade>("updateCroisade", args as unknown as Record<string, unknown>);
+}
+
+export function closeCroisade(id: string): Promise<void> {
+  return fetchAdminCroisades<void>("closeCroisade", { id });
+}
+
+export function reopenCroisade(id: string): Promise<void> {
+  return fetchAdminCroisades<void>("reopenCroisade", { id });
+}
+
+export function getCroisadeStats(id: string): Promise<CroisadeStats> {
+  return fetchAdminCroisades<CroisadeStats>("getCroisadeStats", { id });
 }

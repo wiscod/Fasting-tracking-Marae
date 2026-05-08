@@ -15,8 +15,9 @@ import { MonthlyView } from "@/components/admin/MonthlyView";
 import { YearlyView } from "@/components/admin/YearlyView";
 import { ProfilesView } from "@/components/admin/ProfilesView";
 import { WeekSelector } from "@/components/admin/WeekSelector";
+import { CroisadesView } from "@/components/admin/CroisadesView";
 
-type Tab = "semaine" | "mois" | "annee" | "profils";
+type Tab = "semaine" | "mois" | "annee" | "profils" | "croisades";
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 
 export function AdminClient({
@@ -39,7 +40,7 @@ export function AdminClient({
     <div className="flex flex-col gap-4">
       {/* Tab bar */}
       <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
-        {(["semaine", "mois", "annee", "profils"] as Tab[]).map((t) => (
+        {(["semaine", "mois", "annee", "profils", "croisades"] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
@@ -50,7 +51,7 @@ export function AdminClient({
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            {t === "semaine" ? "Semaine" : t === "mois" ? "Mois" : t === "annee" ? "Année" : "Profils"}
+            {t === "semaine" ? "Sem." : t === "mois" ? "Mois" : t === "annee" ? "Année" : t === "profils" ? "Profils" : "Croisades"}
           </button>
         ))}
       </div>
@@ -62,6 +63,7 @@ export function AdminClient({
       {tab === "mois" && <MonthlyView />}
       {tab === "annee" && <YearlyView />}
       {tab === "profils" && <ProfilesView />}
+      {tab === "croisades" && <CroisadesView />}
 
       {/* Logout */}
       <div className="border-t border-slate-200 pt-2">

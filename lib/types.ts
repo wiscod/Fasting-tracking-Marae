@@ -53,3 +53,16 @@ export type Profile = {
   created_at: string;
   updated_at: string;
 };
+
+export type Croisade = {
+  id: string;
+  name: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  is_dirigeant: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
