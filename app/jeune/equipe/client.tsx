@@ -6,12 +6,14 @@ import { SubjectsEditor, SubjectRow } from "@/components/SubjectsEditor";
 import { isoWeeksInYear, getIsoWeek } from "@/lib/week";
 import { TotalsBar } from "@/components/TotalsBar";
 import {
+  getActiveCroisade,
+  getCroisadeSubjects,
   getOrCreateWeeklyFast,
   getTeamFastEntry,
   getWeeklyFastSubjects,
   saveTeamFastEntry,
 } from "@/lib/data";
-import type { WeeklyFast, WeeklyFastSubject } from "@/lib/types";
+import type { Croisade, CroisadeSubject, WeeklyFast, WeeklyFastSubject } from "@/lib/types";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 
@@ -29,6 +31,8 @@ export function TeamFastClient({
 
   const [weeklyFast, setWeeklyFast] = useState<WeeklyFast | null>(null);
   const [predefined, setPredefined] = useState<WeeklyFastSubject[]>([]);
+  const [croisade, setCroisade] = useState<Croisade | null>(null);
+  const [croisadeSubjects, setCroisadeSubjects] = useState<CroisadeSubject[]>([]);
   const [rows, setRows] = useState<SubjectRow[]>([]);
   const [globalHours, setGlobalHours] = useState<string>("");
 
@@ -38,14 +42,23 @@ export function TeamFastClient({
       setStatus("loading");
       setErrorMsg(null);
       try {
-        const wf = await getOrCreateWeeklyFast(year, week);
+        const today = new Date().toISOString().slice(0, 10);
+        const [wf, activeCroisade] = await Promise.all([
+          getOrCreateWeeklyFast(year, week),
+          getActiveCroisade(today, false),
+        ]);
         if (!wf) throw new Error("Jeûne introuvable");
-        const subs = await getWeeklyFastSubjects(wf.id);
-        const { entry, subjects } = await getTeamFastEntry(wf.id);
+        const [subs, croisadeSubs, { entry, subjects }] = await Promise.all([
+          getWeeklyFastSubjects(wf.id),
+          activeCroisade ? getCroisadeSubjects(activeCroisade.id) : Promise.resolve([]),
+          getTeamFastEntry(wf.id),
+        ]);
         if (cancelled) return;
 
         setWeeklyFast(wf);
         setPredefined(subs);
+        setCroisade(activeCroisade);
+        setCroisadeSubjects(croisadeSubs);
         setGlobalHours(entry?.global_hours != null ? String(entry.global_hours) : "");
 
         const initialRows: SubjectRow[] = [];
@@ -53,6 +66,7 @@ export function TeamFastClient({
           const existing = subjects.find((es) => es.weekly_fast_subject_id === s.id);
           initialRows.push({
             weekly_fast_subject_id: s.id,
+            croisade_subject_id: null,
             custom_label: null,
             label: s.label,
             intercessions: existing?.intercessions ?? 0,
@@ -60,10 +74,23 @@ export function TeamFastClient({
             editable: false,
           });
         }
-        for (const es of subjects) {
-          if (es.weekly_fast_subject_id) continue;
+        for (const cs of croisadeSubs) {
+          const existing = subjects.find((es) => es.croisade_subject_id === cs.id);
           initialRows.push({
             weekly_fast_subject_id: null,
+            croisade_subject_id: cs.id,
+            custom_label: null,
+            label: cs.label,
+            intercessions: existing?.intercessions ?? 0,
+            hours: existing?.hours != null ? Number(existing.hours) : 0,
+            editable: false,
+          });
+        }
+        for (const es of subjects) {
+          if (es.weekly_fast_subject_id || es.croisade_subject_id) continue;
+          initialRows.push({
+            weekly_fast_subject_id: null,
+            croisade_subject_id: null,
             custom_label: es.custom_label ?? "",
             label: es.custom_label ?? "",
             intercessions: es.intercessions,
@@ -101,6 +128,7 @@ export function TeamFastClient({
       ...rs,
       {
         weekly_fast_subject_id: null,
+        croisade_subject_id: null,
         custom_label: "",
         label: "",
         intercessions: 0,
@@ -122,6 +150,7 @@ export function TeamFastClient({
         .filter((r) => r.editable ? (r.label.trim() !== "") : true)
         .map((r, i) => ({
           weekly_fast_subject_id: r.weekly_fast_subject_id,
+          croisade_subject_id: r.croisade_subject_id ?? null,
           custom_label: r.editable ? r.label.trim() : null,
           intercessions: r.intercessions || 0,
           hours: r.hours || 0,
@@ -206,6 +235,9 @@ export function TeamFastClient({
           {weeklyFast?.title ? (
             <p className="text-xs text-slate-500">{weeklyFast.title}</p>
           ) : null}
+          {croisade && (
+            <p className="text-xs font-medium text-brand-600 mt-0.5">🏹 {croisade.name}</p>
+          )}
         </div>
       </div>
       <div className="card flex flex-col gap-4">

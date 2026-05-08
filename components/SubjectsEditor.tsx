@@ -2,6 +2,7 @@
 
 export type SubjectRow = {
   weekly_fast_subject_id: string | null;
+  croisade_subject_id: string | null;
   custom_label: string | null;
   label: string;
   intercessions: number;

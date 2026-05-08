@@ -37,6 +37,7 @@ export type FastEntrySubject = {
   id: string;
   fast_entry_id: string;
   weekly_fast_subject_id: string | null;
+  croisade_subject_id: string | null;
   custom_label: string | null;
   intercessions: number;
   hours: number;
@@ -52,6 +53,14 @@ export type Profile = {
   is_dirigeant: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type CroisadeSubject = {
+  id: string;
+  croisade_id: string;
+  position: number;
+  label: string;
+  created_at: string;
 };
 
 export type Croisade = {

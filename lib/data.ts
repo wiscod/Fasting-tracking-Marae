@@ -1,6 +1,7 @@
 import { getSupabaseBrowser } from "./supabaseBrowser";
 import type {
   Croisade,
+  CroisadeSubject,
   FastEntry,
   FastEntrySubject,
   WeeklyFast,
@@ -60,6 +61,19 @@ export async function getWeeklyFastSubjects(
   return (data ?? []) as WeeklyFastSubject[];
 }
 
+export async function getCroisadeSubjects(
+  croisadeId: string,
+): Promise<CroisadeSubject[]> {
+  const sb = getSupabaseBrowser();
+  const { data, error } = await sb
+    .from("croisade_subjects")
+    .select("*")
+    .eq("croisade_id", croisadeId)
+    .order("position", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as CroisadeSubject[];
+}
+
 export async function getTeamFastEntry(
   weeklyFastId: string,
 ): Promise<{ entry: FastEntry | null; subjects: FastEntrySubject[] }> {
@@ -89,6 +103,7 @@ export async function getTeamFastEntry(
 
 export type SubjectInput = {
   weekly_fast_subject_id: string | null;
+  croisade_subject_id?: string | null;
   custom_label: string | null;
   intercessions: number;
   hours: number;
@@ -468,4 +483,15 @@ export function reopenCroisade(id: string): Promise<void> {
 
 export function getCroisadeStats(id: string): Promise<CroisadeStats> {
   return fetchAdminCroisades<CroisadeStats>("getCroisadeStats", { id });
+}
+
+export function getCroisadeSubjectsAdmin(id: string): Promise<CroisadeSubject[]> {
+  return fetchAdminCroisades<CroisadeSubject[]>("getCroisadeSubjects", { id });
+}
+
+export function saveCroisadeSubjects(
+  id: string,
+  subjects: { position: number; label: string }[],
+): Promise<void> {
+  return fetchAdminCroisades<void>("saveCroisadeSubjects", { id, subjects });
 }

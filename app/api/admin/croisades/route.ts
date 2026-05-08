@@ -11,6 +11,7 @@ type Body = {
   start_date?: string;
   end_date?: string;
   is_dirigeant?: boolean;
+  subjects?: { position: number; label: string }[];
 };
 
 export async function POST(req: Request) {
@@ -123,6 +124,33 @@ export async function POST(req: Request) {
       totalIntercessions,
       participants,
     });
+  }
+
+  // ── getCroisadeSubjects ──
+  if (body.action === "getCroisadeSubjects") {
+    const { id } = body;
+    if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
+    const { data, error } = await sb
+      .from("croisade_subjects")
+      .select("*")
+      .eq("croisade_id", id)
+      .order("position", { ascending: true });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data ?? []);
+  }
+
+  // ── saveCroisadeSubjects ──
+  if (body.action === "saveCroisadeSubjects") {
+    const { id, subjects } = body;
+    if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
+    const { error: delErr } = await sb.from("croisade_subjects").delete().eq("croisade_id", id);
+    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+    if (subjects && subjects.length > 0) {
+      const rows = subjects.map((s) => ({ croisade_id: id, position: s.position, label: s.label }));
+      const { error: insErr } = await sb.from("croisade_subjects").insert(rows);
+      if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Action inconnue" }, { status: 400 });

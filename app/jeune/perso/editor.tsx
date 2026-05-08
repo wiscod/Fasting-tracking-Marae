@@ -60,6 +60,7 @@ export function PersonalEditor({
         setRows(
           subjects.map((s) => ({
             weekly_fast_subject_id: s.weekly_fast_subject_id,
+            croisade_subject_id: null,
             custom_label: s.custom_label,
             label: s.custom_label ?? "",
             intercessions: s.intercessions,
@@ -290,7 +291,7 @@ export function PersonalEditor({
 }
 
 function emptyRow(): SubjectRow {
-  return { weekly_fast_subject_id: null, custom_label: "", label: "", intercessions: 0, hours: 0, editable: true };
+  return { weekly_fast_subject_id: null, croisade_subject_id: null, custom_label: "", label: "", intercessions: 0, hours: 0, editable: true };
 }
 
 function messageOf(e: unknown): string {

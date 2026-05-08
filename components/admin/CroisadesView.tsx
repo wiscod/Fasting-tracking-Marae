@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Croisade } from "@/lib/types";
+import type { Croisade, CroisadeSubject } from "@/lib/types";
 import type { CroisadeStats } from "@/lib/data";
 import {
   getAllCroisades,
@@ -10,9 +10,11 @@ import {
   closeCroisade,
   reopenCroisade,
   getCroisadeStats,
+  getCroisadeSubjectsAdmin,
+  saveCroisadeSubjects,
 } from "@/lib/data";
 
-type View = "list" | "create" | "edit" | "stats";
+type View = "list" | "create" | "edit" | "stats" | "subjects";
 
 function fmt(iso: string) {
   try { return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }); }
@@ -25,6 +27,7 @@ export function CroisadesView() {
   const [view, setView] = useState<View>("list");
   const [selected, setSelected] = useState<Croisade | null>(null);
   const [stats, setStats] = useState<CroisadeStats | null>(null);
+  const [subjects, setSubjects] = useState<CroisadeSubject[] | null>(null);
 
   useEffect(() => {
     load();
@@ -64,6 +67,16 @@ export function CroisadesView() {
     } catch (e: unknown) { setError(msg(e)); }
   }
 
+  async function handleSubjects(c: Croisade) {
+    setSelected(c);
+    setSubjects(null);
+    setView("subjects");
+    try {
+      const s = await getCroisadeSubjectsAdmin(c.id);
+      setSubjects(s);
+    } catch (e: unknown) { setError(msg(e)); }
+  }
+
   if (view === "create") {
     return (
       <CroisadeForm
@@ -87,6 +100,18 @@ export function CroisadesView() {
           setView("list");
         }}
         onCancel={() => setView("list")}
+      />
+    );
+  }
+
+  if (view === "subjects" && selected) {
+    return (
+      <SubjectsEditorView
+        croisade={selected}
+        initial={subjects ?? []}
+        loading={subjects === null}
+        onBack={() => setView("list")}
+        onSaved={(updated) => setSubjects(updated)}
       />
     );
   }
@@ -156,6 +181,7 @@ export function CroisadesView() {
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button type="button" onClick={() => handleStats(c)} className="btn-secondary text-xs">Stats</button>
+                <button type="button" onClick={() => handleSubjects(c)} className="btn-secondary text-xs">Sujets</button>
                 <button type="button" onClick={() => { setSelected(c); setView("edit"); }} className="btn-secondary text-xs">Modifier</button>
                 {c.is_active ? (
                   <button type="button" onClick={() => handleClose(c)} className="btn-secondary text-xs text-red-600">Fermer</button>
@@ -239,6 +265,97 @@ function CroisadeForm({
         {saving ? "Enregistrement…" : initial ? "Enregistrer" : "Créer"}
       </button>
     </form>
+  );
+}
+
+function SubjectsEditorView({
+  croisade,
+  initial,
+  loading,
+  onBack,
+  onSaved,
+}: {
+  croisade: Croisade;
+  initial: CroisadeSubject[];
+  loading: boolean;
+  onBack: () => void;
+  onSaved: (updated: CroisadeSubject[]) => void;
+}) {
+  const [labels, setLabels] = useState<string[]>(initial.map((s) => s.label));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  // Sync when initial loads
+  useEffect(() => {
+    setLabels(initial.map((s) => s.label));
+  }, [initial]);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const subjects = labels
+        .map((l, i) => ({ position: i + 1, label: l.trim() }))
+        .filter((s) => s.label !== "");
+      await saveCroisadeSubjects(croisade.id, subjects);
+      const updated = subjects.map((s, i) => ({
+        id: initial[i]?.id ?? "",
+        croisade_id: croisade.id,
+        position: s.position,
+        label: s.label,
+        created_at: initial[i]?.created_at ?? "",
+      }));
+      onSaved(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e: unknown) {
+      setError(msg(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <button type="button" onClick={onBack} className="text-sm text-slate-500 hover:text-slate-800 self-start">← Retour</button>
+      <div>
+        <h2 className="text-base font-semibold">Sujets — {croisade.name}</h2>
+        <p className="text-xs text-slate-500 mt-0.5">{croisade.is_dirigeant ? "Dirigeants" : "Équipe"}</p>
+      </div>
+      {loading ? (
+        <p className="text-sm text-slate-500">Chargement…</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {labels.map((label, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-5 text-center text-sm font-bold text-brand-600">{i + 1}</span>
+              <input
+                className="input flex-1 text-sm"
+                value={label}
+                onChange={(e) => setLabels((ls) => ls.map((l, j) => j === i ? e.target.value : l))}
+                placeholder={`Sujet ${i + 1}`}
+              />
+              <button
+                type="button"
+                onClick={() => setLabels((ls) => ls.filter((_, j) => j !== i))}
+                className="text-slate-300 hover:text-red-500"
+              >×</button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setLabels((ls) => [...ls, ""])}
+            className="self-start text-sm font-medium text-brand-600 hover:text-brand-700"
+          >+ Ajouter un sujet</button>
+        </div>
+      )}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <button type="button" onClick={handleSave} disabled={saving || loading} className="btn-primary">
+        {saving ? "Enregistrement…" : saved ? "✓ Enregistré" : "Enregistrer les sujets"}
+      </button>
+    </div>
   );
 }
 
