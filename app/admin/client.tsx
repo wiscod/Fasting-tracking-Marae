@@ -29,6 +29,7 @@ export function AdminClient({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("semaine");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   async function handleLogout() {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -39,7 +40,8 @@ export function AdminClient({
   return (
     <div className="flex flex-col gap-4">
       {/* Tab bar */}
-      <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
+      <div className="flex items-center gap-1">
+        <div className="flex flex-1 rounded-xl bg-slate-100 p-1 gap-1">
         {(["semaine", "mois", "annee", "profils", "croisades"] as Tab[]).map((t) => (
           <button
             key={t}
@@ -54,16 +56,23 @@ export function AdminClient({
             {t === "semaine" ? "Sem." : t === "mois" ? "Mois" : t === "annee" ? "Année" : t === "profils" ? "Profils" : "Croisades"}
           </button>
         ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setRefreshKey((k) => k + 1)}
+          className="btn-secondary px-2 text-sm"
+          title="Rafraîchir"
+        >↺</button>
       </div>
 
       {/* Tab content */}
       {tab === "semaine" && (
-        <WeekTab initialYear={initialYear} initialWeek={initialWeek} />
+        <WeekTab key={refreshKey} initialYear={initialYear} initialWeek={initialWeek} />
       )}
-      {tab === "mois" && <MonthlyView />}
-      {tab === "annee" && <YearlyView />}
-      {tab === "profils" && <ProfilesView />}
-      {tab === "croisades" && <CroisadesView />}
+      {tab === "mois" && <MonthlyView key={refreshKey} />}
+      {tab === "annee" && <YearlyView key={refreshKey} />}
+      {tab === "profils" && <ProfilesView key={refreshKey} />}
+      {tab === "croisades" && <CroisadesView key={refreshKey} />}
 
       {/* Logout */}
       <div className="border-t border-slate-200 pt-2">
