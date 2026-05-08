@@ -6,9 +6,11 @@ import { SubjectsEditor, SubjectRow } from "@/components/SubjectsEditor";
 import { TotalsBar } from "@/components/TotalsBar";
 import {
   deletePersonalFast,
+  getActiveCroisade,
   getPersonalFast,
   savePersonalFast,
 } from "@/lib/data";
+import type { Croisade } from "@/lib/types";
 
 type Status = "loading" | "ready" | "saving" | "saved" | "error";
 type FastType = "complet" | "partiel" | "absolu";
@@ -22,9 +24,11 @@ const FAST_TYPES: { value: FastType; label: string; desc: string }[] = [
 export function PersonalEditor({
   mode,
   entryId,
+  isDirigent = false,
 }: {
   mode: "create" | "edit";
   entryId?: string;
+  isDirigent?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>(mode === "edit" ? "loading" : "ready");
@@ -38,6 +42,13 @@ export function PersonalEditor({
   const [globalHours, setGlobalHours] = useState("");
   const [rows, setRows] = useState<SubjectRow[]>([]);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
+  const [dirigeantCroisade, setDirigeantCroisade] = useState<Croisade | null>(null);
+
+  useEffect(() => {
+    if (isDirigent) {
+      getActiveCroisade(undefined, true).then(setDirigeantCroisade).catch(() => {});
+    }
+  }, [isDirigent]);
 
   useEffect(() => {
     if (mode === "create") setRows([emptyRow()]);
@@ -113,6 +124,14 @@ export function PersonalEditor({
     setStatus("saving");
     setErrorMsg(null);
     try {
+      if (isDirigent && dirigeantCroisade) {
+        const days = durationDays ?? 1;
+        if (days < 3) {
+          setErrorMsg("Pendant la croisade des dirigeants, le jeûne doit durer au moins 3 jours.");
+          setStatus("error");
+          return;
+        }
+      }
       const subjects = rows
         .filter((r) => r.label.trim() !== "" || r.weekly_fast_subject_id)
         .map((r, i) => ({

@@ -502,17 +502,27 @@ export async function getMyCroisadeFasts(croisade: Croisade): Promise<CroisadeFa
   const sb = getSupabaseBrowser();
   const userId = await getUserId();
 
-  let query = sb
+  // Only show fasts that have at least one subject from this croisade
+  const { data: croisadeSubs } = await sb
+    .from("croisade_subjects")
+    .select("id")
+    .eq("croisade_id", croisade.id);
+  const croisadeSubIds = (croisadeSubs ?? []).map((s: { id: string }) => s.id);
+  if (croisadeSubIds.length === 0) return [];
+
+  const { data: matchingSubs } = await sb
+    .from("fast_entry_subjects")
+    .select("fast_entry_id")
+    .in("croisade_subject_id", croisadeSubIds);
+  const entryIds = [...new Set((matchingSubs ?? []).map((s: { fast_entry_id: string }) => s.fast_entry_id))];
+  if (entryIds.length === 0) return [];
+
+  const { data: entries, error } = await sb
     .from("fast_entries")
     .select("*")
     .eq("user_id", userId)
-    .gte("fast_date", croisade.start_date);
-
-  if (croisade.end_date) {
-    query = query.lte("fast_date", croisade.end_date);
-  }
-
-  const { data: entries, error } = await query.order("fast_date", { ascending: true });
+    .in("id", entryIds)
+    .order("fast_date", { ascending: true });
   if (error) throw error;
 
   const cast = (entries ?? []) as FastEntry[];
