@@ -440,7 +440,7 @@ export async function getActiveCroisade(
     .select("*")
     .eq("is_dirigeant", isDirigent)
     .lte("start_date", today)
-    .gte("end_date", today)
+    .or(`end_date.is.null,end_date.gte.${today}`)
     .eq("is_active", true)
     .order("start_date", { ascending: false })
     .limit(1)
@@ -457,7 +457,7 @@ export function createCroisade(args: {
   name: string;
   description: string | null;
   start_date: string;
-  end_date: string;
+  end_date: string | null;
   is_dirigeant: boolean;
 }): Promise<Croisade> {
   return fetchAdminCroisades<Croisade>("createCroisade", args as unknown as Record<string, unknown>);
@@ -468,7 +468,7 @@ export function updateCroisade(args: {
   name: string;
   description: string | null;
   start_date: string;
-  end_date: string;
+  end_date: string | null;
 }): Promise<Croisade> {
   return fetchAdminCroisades<Croisade>("updateCroisade", args as unknown as Record<string, unknown>);
 }
@@ -494,4 +494,40 @@ export function saveCroisadeSubjects(
   subjects: { position: number; label: string }[],
 ): Promise<void> {
   return fetchAdminCroisades<void>("saveCroisadeSubjects", { id, subjects });
+}
+
+export type CroisadeFastItem = FastEntry & { weekLabel: string | null };
+
+export async function getMyCroisadeFasts(croisade: Croisade): Promise<CroisadeFastItem[]> {
+  const sb = getSupabaseBrowser();
+  const userId = await getUserId();
+
+  let query = sb
+    .from("fast_entries")
+    .select("*")
+    .eq("user_id", userId)
+    .gte("fast_date", croisade.start_date);
+
+  if (croisade.end_date) {
+    query = query.lte("fast_date", croisade.end_date);
+  }
+
+  const { data: entries, error } = await query.order("fast_date", { ascending: true });
+  if (error) throw error;
+
+  const cast = (entries ?? []) as FastEntry[];
+  const wfIds = [...new Set(cast.map((e) => e.weekly_fast_id).filter(Boolean) as string[])];
+  let wfMap = new Map<string, { year: number; week: number }>();
+  if (wfIds.length > 0) {
+    const { data: wfs } = await sb
+      .from("weekly_fasts")
+      .select("id, year, week")
+      .in("id", wfIds);
+    wfMap = new Map((wfs ?? []).map((w: { id: string; year: number; week: number }) => [w.id, { year: w.year, week: w.week }]));
+  }
+
+  return cast.map((e) => {
+    const wf = e.weekly_fast_id ? wfMap.get(e.weekly_fast_id!) : undefined;
+    return { ...e, weekLabel: wf ? `Sem ${wf.week} ${wf.year}` : null };
+  });
 }

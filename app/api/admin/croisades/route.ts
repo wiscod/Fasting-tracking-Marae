@@ -9,7 +9,7 @@ type Body = {
   name?: string;
   description?: string | null;
   start_date?: string;
-  end_date?: string;
+  end_date?: string | null;
   is_dirigeant?: boolean;
   subjects?: { position: number; label: string }[];
 };
@@ -31,11 +31,11 @@ export async function POST(req: Request) {
   // ── createCroisade ──
   if (body.action === "createCroisade") {
     const { name, description, start_date, end_date, is_dirigeant } = body;
-    if (!name || !start_date || !end_date)
-      return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+    if (!name || !start_date)
+      return NextResponse.json({ error: "Nom et date de début requis" }, { status: 400 });
     const { data, error } = await sb
       .from("croisades")
-      .insert({ name, description: description ?? null, start_date, end_date, is_dirigeant: is_dirigeant ?? false })
+      .insert({ name, description: description ?? null, start_date, end_date: end_date ?? null, is_dirigeant: is_dirigeant ?? false })
       .select("*")
       .single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
     const { data, error } = await sb
       .from("croisades")
-      .update({ name, description: description ?? null, start_date, end_date, updated_at: new Date().toISOString() })
+      .update({ name, description: description ?? null, start_date, end_date: end_date ?? null, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select("*")
       .single();
@@ -88,11 +88,12 @@ export async function POST(req: Request) {
     if (cErr || !croisade) return NextResponse.json({ error: "Croisade introuvable" }, { status: 404 });
 
     // Find fast_entries whose fast_date falls within the croisade period
-    const { data: entries, error: eErr } = await sb
+    let entriesQuery = sb
       .from("fast_entries")
       .select("id, user_id, global_hours")
-      .gte("fast_date", croisade.start_date)
-      .lte("fast_date", croisade.end_date);
+      .gte("fast_date", croisade.start_date);
+    if (croisade.end_date) entriesQuery = entriesQuery.lte("fast_date", croisade.end_date);
+    const { data: entries, error: eErr } = await entriesQuery;
     if (eErr) return NextResponse.json({ error: eErr.message }, { status: 500 });
 
     const entryIds = (entries ?? []).map((e: { id: string }) => e.id);

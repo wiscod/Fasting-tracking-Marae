@@ -68,7 +68,7 @@ export type Croisade = {
   name: string;
   description: string | null;
   start_date: string;
-  end_date: string;
+  end_date: string | null;
   is_dirigeant: boolean;
   is_active: boolean;
   created_at: string;

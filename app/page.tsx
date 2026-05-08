@@ -24,9 +24,9 @@ export default async function HomePage() {
   // Load active croisades (team + dirigeant) in parallel
   const [{ data: teamCroisadeData }, { data: dirigeantCroisadeData }] = await Promise.all([
     sb.from("croisades").select("*").eq("is_dirigeant", false).eq("is_active", true)
-      .lte("start_date", today).gte("end_date", today).order("start_date", { ascending: false }).limit(1),
+      .lte("start_date", today).or(`end_date.is.null,end_date.gte.${today}`).order("start_date", { ascending: false }).limit(1),
     sb.from("croisades").select("*").eq("is_dirigeant", true).eq("is_active", true)
-      .lte("start_date", today).gte("end_date", today).order("start_date", { ascending: false }).limit(1),
+      .lte("start_date", today).or(`end_date.is.null,end_date.gte.${today}`).order("start_date", { ascending: false }).limit(1),
   ]);
 
   const teamCroisade = (teamCroisadeData?.[0] ?? null) as Croisade | null;
@@ -56,6 +56,14 @@ export default async function HomePage() {
         </span>
       </Link>
 
+      {teamCroisade && (
+        <Link href={`/jeune/croisade/${teamCroisade.id}`} className="card flex flex-col gap-1 hover:border-brand-500">
+          <span className="text-xs uppercase tracking-wide text-brand-600">Mes jeûnes · {teamCroisade.name}</span>
+          <span className="text-lg font-semibold">Voir mes jeûnes de la croisade</span>
+          <span className="text-sm text-slate-500">Consulte tes jeûnes effectués pendant cette croisade.</span>
+        </Link>
+      )}
+
       <Link href="/jeune/perso" className="card flex flex-col gap-1 hover:border-brand-500">
         <span className="text-xs uppercase tracking-wide text-brand-600">Tous mes jeûnes</span>
         <span className="text-lg font-semibold">Mes jeûnes</span>
@@ -65,17 +73,26 @@ export default async function HomePage() {
       </Link>
 
       {isDirigent && (
-        <Link href="/jeune/dirigeant" className="card flex flex-col gap-1 hover:border-amber-500 border-amber-200">
-          <span className="text-xs uppercase tracking-wide text-amber-600">
-            {dirigeantCroisade ? `Croisade dirigeants · ${dirigeantCroisade.name}` : "Dirigeants · Cette semaine"}
-          </span>
-          <span className="text-lg font-semibold">
-            {dirigeantCroisade ? `Jeûne des dirigeants — ${dirigeantCroisade.name}` : `Jeûne des dirigeants — Sem ${week.week}`}
-          </span>
-          <span className="text-sm text-slate-500">
-            {dirigeantCroisade?.description ?? "Enregistre tes importunités et tes jeûnes en tant que dirigeant."}
-          </span>
-        </Link>
+        <>
+          <Link href="/jeune/dirigeant" className="card flex flex-col gap-1 hover:border-amber-500 border-amber-200">
+            <span className="text-xs uppercase tracking-wide text-amber-600">
+              {dirigeantCroisade ? `Croisade dirigeants · ${dirigeantCroisade.name}` : "Dirigeants · Cette semaine"}
+            </span>
+            <span className="text-lg font-semibold">
+              {dirigeantCroisade ? `Jeûne des dirigeants — ${dirigeantCroisade.name}` : `Jeûne des dirigeants — Sem ${week.week}`}
+            </span>
+            <span className="text-sm text-slate-500">
+              {dirigeantCroisade?.description ?? "Enregistre tes importunités et tes jeûnes en tant que dirigeant."}
+            </span>
+          </Link>
+          {dirigeantCroisade && (
+            <Link href={`/jeune/croisade/${dirigeantCroisade.id}`} className="card flex flex-col gap-1 hover:border-amber-500 border-amber-200">
+              <span className="text-xs uppercase tracking-wide text-amber-600">Mes jeûnes · {dirigeantCroisade.name}</span>
+              <span className="text-lg font-semibold">Voir mes jeûnes de la croisade</span>
+              <span className="text-sm text-slate-500">Consulte tes jeûnes effectués pendant cette croisade.</span>
+            </Link>
+          )}
+        </>
       )}
     </main>
   );

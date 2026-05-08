@@ -121,7 +121,7 @@ export function CroisadesView() {
       <div className="flex flex-col gap-4">
         <button type="button" onClick={() => setView("list")} className="text-sm text-slate-500 hover:text-slate-800 self-start">← Retour</button>
         <h2 className="text-base font-semibold">{selected.name}</h2>
-        <p className="text-xs text-slate-500">{fmt(selected.start_date)} → {fmt(selected.end_date)}</p>
+        <p className="text-xs text-slate-500">{fmt(selected.start_date)} → {selected.end_date ? fmt(selected.end_date) : "À définir"}</p>
         {stats === null ? (
           <p className="text-sm text-slate-500">Chargement…</p>
         ) : (
@@ -176,7 +176,7 @@ export function CroisadesView() {
                   </div>
                   <p className="text-sm font-semibold">{c.name}</p>
                   {c.description && <p className="text-xs text-slate-500">{c.description}</p>}
-                  <p className="text-xs text-slate-400">{fmt(c.start_date)} → {fmt(c.end_date)}</p>
+                  <p className="text-xs text-slate-400">{fmt(c.start_date)} → {c.end_date ? fmt(c.end_date) : "À définir"}</p>
                 </div>
               </div>
               <div className="flex gap-2 flex-wrap">
@@ -203,7 +203,7 @@ function CroisadeForm({
   onCancel,
 }: {
   initial?: Croisade;
-  onSave: (v: { name: string; description: string | null; start_date: string; end_date: string; is_dirigeant: boolean }) => Promise<void>;
+  onSave: (v: { name: string; description: string | null; start_date: string; end_date: string | null; is_dirigeant: boolean }) => Promise<void>;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -216,7 +216,7 @@ function CroisadeForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !startDate || !endDate) return setError("Nom et dates requis.");
+    if (!name.trim() || !startDate) return setError("Nom et date de début requis.");
     setSaving(true);
     setError(null);
     try {
@@ -224,7 +224,7 @@ function CroisadeForm({
         name: name.trim(),
         description: description.trim() || null,
         start_date: startDate,
-        end_date: endDate,
+        end_date: endDate.trim() || null,
         is_dirigeant: isDirigent,
       });
     } catch (e: unknown) {
@@ -253,7 +253,7 @@ function CroisadeForm({
         <div className="w-px bg-slate-200" />
         <div className="flex flex-1 flex-col gap-0.5 px-3 py-2">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Fin</span>
-          <input type="date" className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} required />
+          <input type="date" className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none" value={endDate} min={startDate} onChange={(e) => setEndDate(e.target.value)} placeholder="À définir" />
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm">
