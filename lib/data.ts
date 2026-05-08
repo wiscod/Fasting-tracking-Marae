@@ -165,9 +165,7 @@ export async function listMyFasts(): Promise<
   const { data: entries, error } = await sb
     .from("fast_entries")
     .select("*")
-    .eq("user_id", userId)
-    .order("fast_date", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
+    .eq("user_id", userId);
   if (error) throw error;
 
   const cast = (entries ?? []) as FastEntry[];
@@ -181,15 +179,30 @@ export async function listMyFasts(): Promise<
     wfMap = new Map((wfs ?? []).map((w: { id: string; year: number; week: number }) => [w.id, { year: w.year, week: w.week }]));
   }
 
-  return cast.map((e) => ({
-    ...e,
-    weekLabel: e.weekly_fast_id
-      ? (() => {
-          const wf = wfMap.get(e.weekly_fast_id!);
-          return wf ? `Sem ${wf.week} ${wf.year}` : null;
-        })()
-      : null,
-  }));
+  const withLabel = cast.map((e) => {
+    const wf = e.weekly_fast_id ? wfMap.get(e.weekly_fast_id!) : undefined;
+    return {
+      ...e,
+      weekLabel: wf ? `Sem ${wf.week} ${wf.year}` : null,
+      _sortDate: e.fast_date
+        ? e.fast_date
+        : wf
+        ? isoWeekMonday(wf.year, wf.week)
+        : e.created_at.slice(0, 10),
+    };
+  });
+
+  withLabel.sort((a, b) => a._sortDate.localeCompare(b._sortDate));
+
+  return withLabel.map(({ _sortDate: _, ...rest }) => rest);
+}
+
+function isoWeekMonday(year: number, week: number): string {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dow = jan4.getUTCDay() || 7;
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - dow + 1 + (week - 1) * 7);
+  return monday.toISOString().slice(0, 10);
 }
 
 export async function getPersonalFast(
