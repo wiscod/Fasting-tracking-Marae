@@ -65,6 +65,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
+  // Force re-login after 3 months
+  const lastSignIn = auth.user.last_sign_in_at;
+  const SESSION_MAX_MS = 90 * 24 * 60 * 60 * 1000;
+  if (lastSignIn && Date.now() - new Date(lastSignIn).getTime() > SESSION_MAX_MS) {
+    await sb.auth.signOut();
+    return NextResponse.redirect(new URL("/auth/login", request.url));
+  }
+
   // Profile check (skip on /auth/complete-profile to avoid loop)
   const { data: profile } = await sb.from("profiles").select("id").eq("id", auth.user.id).maybeSingle();
   if (!profile) {
