@@ -186,7 +186,7 @@ export function DirigentFastClient({
     );
   }
 
-  if (predefined.length === 0) {
+  if (predefined.length === 0 && croisadeSubjects.length === 0) {
     return (
       <div className="card text-sm text-slate-700">
         <p className="font-medium">Pas encore de sujets pour Sem {week}.</p>
