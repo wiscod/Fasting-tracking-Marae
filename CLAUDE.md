@@ -77,6 +77,8 @@ Custom component classes are defined in `app/globals.css` via `@layer components
 
 ## Behavioral Guidelines
 
+Lorsque tu t'adresses à l'utilisateur, parle en français.
+
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
 ### 1. Think Before Coding

@@ -249,21 +249,57 @@ export async function POST(req: Request) {
     if ([fromYear, fromWeek, toYear, toWeek].some((v) => typeof v !== "number")) {
       return NextResponse.json({ error: "Plage requise" }, { status: 400 });
     }
-    const { data: wfs } = await sb.from("weekly_fasts").select("id, year, week");
+
+    // Helper: compute ISO year+week from a date string
+    function isoWeekOf(dateStr: string): { year: number; week: number } {
+      const d = new Date(dateStr + "T00:00:00Z");
+      const day = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - day);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const week = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      return { year: d.getUTCFullYear(), week };
+    }
+
+    // Helper: Monday date string of a given ISO year+week
+    function weekStartDate(y: number, w: number): string {
+      const jan4 = new Date(Date.UTC(y, 0, 4));
+      const startOfW1 = new Date(jan4);
+      startOfW1.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() || 7) - 1));
+      const d = new Date(startOfW1);
+      d.setUTCDate(startOfW1.getUTCDate() + (w - 1) * 7);
+      return d.toISOString().slice(0, 10);
+    }
+
     const inRange = (y: number, w: number) => {
       const from = fromYear! * 100 + fromWeek!;
       const to = toYear! * 100 + toWeek!;
       const cur = y * 100 + w;
       return cur >= from && cur <= to;
     };
+
+    const dateFrom = weekStartDate(fromYear!, fromWeek!);
+    // Sunday of last week = Monday + 6 days
+    const lastMonday = new Date(weekStartDate(toYear!, toWeek!) + "T00:00:00Z");
+    lastMonday.setUTCDate(lastMonday.getUTCDate() + 6);
+    const dateTo = lastMonday.toISOString().slice(0, 10);
+
+    // Fetch team fasts via weekly_fast_id
+    const { data: wfs } = await sb.from("weekly_fasts").select("id, year, week");
     const wfsInRange = ((wfs ?? []) as WeeklyFast[]).filter((wf) => inRange(wf.year, wf.week));
     const wfIds = wfsInRange.map((wf) => wf.id);
     const wfById = new Map(wfsInRange.map((wf) => [wf.id, wf]));
-    const { data: entries } = await sb
-      .from("fast_entries")
-      .select("id, kind, global_hours, weekly_fast_id")
-      .in("weekly_fast_id", wfIds.length ? wfIds : ["none"]);
-    const cast = (entries ?? []) as FastEntry[];
+
+    const [teamEntriesRes, personalEntriesRes] = await Promise.all([
+      wfIds.length
+        ? sb.from("fast_entries").select("id, kind, global_hours, weekly_fast_id, fast_date").in("weekly_fast_id", wfIds)
+        : Promise.resolve({ data: [] }),
+      sb.from("fast_entries").select("id, kind, global_hours, weekly_fast_id, fast_date")
+        .is("weekly_fast_id", null)
+        .gte("fast_date", dateFrom)
+        .lte("fast_date", dateTo),
+    ]);
+
+    const cast = [...((teamEntriesRes.data ?? []) as FastEntry[]), ...((personalEntriesRes.data ?? []) as FastEntry[])];
     const ids = cast.map((e) => e.id);
     const { data: subs } = ids.length
       ? await sb.from("fast_entry_subjects").select("fast_entry_id, intercessions, hours").in("fast_entry_id", ids)
@@ -273,6 +309,7 @@ export async function POST(req: Request) {
       const list = subsByEntry.get(s.fast_entry_id) ?? [];
       list.push(s); subsByEntry.set(s.fast_entry_id, list);
     }
+
     const aggMap = new Map<string, {
       year: number; week: number; label: string;
       teamCount: number; personalCount: number;
@@ -284,11 +321,25 @@ export async function POST(req: Request) {
         teamCount: 0, personalCount: 0, totalImportunites: 0, totalMinutes: 0,
       });
     }
+
+    function getOrCreateBucket(y: number, w: number) {
+      const key = `${y}-${w}`;
+      if (!aggMap.has(key)) aggMap.set(key, { year: y, week: w, label: `S${w}`, teamCount: 0, personalCount: 0, totalImportunites: 0, totalMinutes: 0 });
+      return aggMap.get(key)!;
+    }
+
     for (const e of cast) {
-      const wf = e.weekly_fast_id ? wfById.get(e.weekly_fast_id) : null;
-      if (!wf) continue;
-      const agg = aggMap.get(`${wf.year}-${wf.week}`);
-      if (!agg) continue;
+      let agg;
+      if (e.weekly_fast_id) {
+        const wf = wfById.get(e.weekly_fast_id);
+        if (!wf) continue;
+        agg = getOrCreateBucket(wf.year, wf.week);
+      } else if (e.fast_date) {
+        const { year: wy, week: ww } = isoWeekOf(e.fast_date);
+        if (!inRange(wy, ww)) continue;
+        agg = getOrCreateBucket(wy, ww);
+      } else continue;
+
       const entrySubs = subsByEntry.get(e.id) ?? [];
       const imp = entrySubs.reduce((a, s) => a + (s.intercessions || 0), 0);
       const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
