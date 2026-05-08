@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
 import { PhoneInput } from "@/components/PhoneInput";
+import { setupNewKey } from "@/lib/crypto";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -49,12 +50,15 @@ export default function SignupPage() {
     }
 
     // Otherwise, insert profile immediately
+    const { salt, wrappedKey } = await setupNewKey(password);
     const { error: profErr } = await sb.from("profiles").insert({
       id: data.user!.id,
       first_name: firstName.trim(),
       last_name: lastName.trim() || null,
       phone,
       discipleship_maker: discipleshipMaker.trim(),
+      enc_salt: salt,
+      enc_wrapped_key: wrappedKey,
     });
     setLoading(false);
     if (profErr) {

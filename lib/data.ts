@@ -1,4 +1,5 @@
 import { getSupabaseBrowser } from "./supabaseBrowser";
+import { getSessionDataKey, encryptLabel, decryptLabel, isEncrypted } from "./crypto";
 import type {
   Croisade,
   CroisadeSubject,
@@ -239,10 +240,14 @@ export async function getPersonalFast(
     .eq("fast_entry_id", entry.id)
     .order("position", { ascending: true });
   if (subErr) throw subErr;
-  return {
-    entry: entry as FastEntry,
-    subjects: (subs ?? []) as FastEntrySubject[],
-  };
+  const dataKey = await getSessionDataKey();
+  const subjects = await Promise.all(((subs ?? []) as FastEntrySubject[]).map(async (s) => {
+    if (s.custom_label && isEncrypted(s.custom_label) && dataKey) {
+      return { ...s, custom_label: (await decryptLabel(s.custom_label, dataKey)) ?? "[Sujet chiffré]" };
+    }
+    return s;
+  }));
+  return { entry: entry as FastEntry, subjects };
 }
 
 export async function savePersonalFast(args: {
@@ -300,7 +305,12 @@ export async function savePersonalFast(args: {
   if (del.error) throw del.error;
 
   if (args.subjects.length > 0) {
-    const rows = args.subjects.map((s) => ({ ...s, fast_entry_id: entryId }));
+    const dataKey = await getSessionDataKey();
+    const rows = await Promise.all(args.subjects.map(async (s) => {
+      let label = s.custom_label;
+      if (label && dataKey) label = await encryptLabel(label, dataKey);
+      return { ...s, custom_label: label, fast_entry_id: entryId };
+    }));
     const insSubs = await sb.from("fast_entry_subjects").insert(rows);
     if (insSubs.error) throw insSubs.error;
   }

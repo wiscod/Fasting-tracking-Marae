@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
+import { initKeyFromLogin, generateDataKey, setSessionDataKey } from "@/lib/crypto";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,12 +19,24 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    setLoading(false);
+    const { data: signData, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+    // Load encryption key for personal prayer subjects
+    if (signData.user) {
+      const { data: profile } = await sb.from("profiles").select("enc_salt, enc_wrapped_key").eq("id", signData.user.id).maybeSingle();
+      if (profile?.enc_salt && profile?.enc_wrapped_key) {
+        try { await initKeyFromLogin(password, profile.enc_salt, profile.enc_wrapped_key); } catch { /* key init failed, subjects will show as encrypted */ }
+      } else {
+        // No key yet (old account) — generate session-only key
+        const dk = await generateDataKey();
+        await setSessionDataKey(dk);
+      }
+    }
+    setLoading(false);
     router.push("/");
     router.refresh();
   }
@@ -82,6 +95,9 @@ export default function LoginPage() {
         <button type="submit" disabled={loading} className="btn-primary">
           {loading ? "Connexion…" : "Se connecter"}
         </button>
+        <Link href="/auth/forgot-password" className="text-center text-xs text-brand-600 hover:text-brand-700">
+          Mot de passe oublié ?
+        </Link>
       </form>
 
       <p className="text-center text-sm text-slate-500">

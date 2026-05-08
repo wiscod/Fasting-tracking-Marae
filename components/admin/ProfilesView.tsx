@@ -233,7 +233,7 @@ function PersonProfileView({
             {personalSubjects.map((s, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
                 <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-green-400" />
-                {s}
+                {s.startsWith("enc:") ? <span className="italic text-slate-400">[Sujet chiffré]</span> : s}
               </li>
             ))}
           </ul>
@@ -320,7 +320,7 @@ function EntryCard({ entry: e, onDelete }: { entry: EntryLike; onDelete: (id: st
           {e.bySubject.map((s, i) => (
             <li key={i} className="flex justify-between text-xs text-slate-600">
               <span className="flex-1 pr-2 leading-snug">
-                {s.custom_label ?? `Sujet ${i + 1}`}
+                {s.custom_label?.startsWith("enc:") ? <span className="italic text-slate-400">[Sujet chiffré]</span> : (s.custom_label ?? `Sujet ${i + 1}`)}
               </span>
               <span className="shrink-0 tabular-nums text-slate-700 font-medium">
                 {s.intercessions} imp. · {formatMinutes(s.minutes)}

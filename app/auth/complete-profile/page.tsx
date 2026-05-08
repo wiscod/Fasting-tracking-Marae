@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabaseBrowser";
 import { PhoneInput } from "@/components/PhoneInput";
+import { generateDataKey, setSessionDataKey } from "@/lib/crypto";
 
 export default function CompleteProfilePage() {
   const router = useRouter();
@@ -48,6 +49,9 @@ export default function CompleteProfilePage() {
       setError(upErr.message);
       return;
     }
+    // Google users: session-only key (no password to derive from)
+    const dk = await generateDataKey();
+    await setSessionDataKey(dk);
     router.push("/");
     router.refresh();
   }
