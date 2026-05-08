@@ -380,6 +380,7 @@ export type WeeklyAggregate = {
 async function fetchAdmin<T>(action: string, body: Record<string, unknown> = {}, endpoint = "/api/admin/data"): Promise<T> {
   const res = await fetch(endpoint, {
     method: "POST",
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, ...body }),
   });
