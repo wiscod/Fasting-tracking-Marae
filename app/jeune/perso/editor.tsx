@@ -112,9 +112,17 @@ export function PersonalEditor({
   function addCustom() { setRows((rs) => [...rs, emptyRow()]); }
   function removeCustom(idx: number) { setRows((rs) => rs.filter((_, i) => i !== idx)); }
 
+  const minEndDate = useMemo(() => {
+    if (!fastDate || !(isDirigent && dirigeantCroisade)) return fastDate;
+    const d = new Date(fastDate);
+    d.setDate(d.getDate() + 2);
+    return d.toISOString().slice(0, 10);
+  }, [fastDate, isDirigent, dirigeantCroisade]);
+
   function handleEndDateChange(val: string) {
-    if (val && fastDate && val < fastDate) {
-      setFastEndDate(fastDate);
+    const floor = minEndDate || fastDate;
+    if (val && floor && val < floor) {
+      setFastEndDate(floor);
     } else {
       setFastEndDate(val);
     }
@@ -124,14 +132,6 @@ export function PersonalEditor({
     setStatus("saving");
     setErrorMsg(null);
     try {
-      if (isDirigent && dirigeantCroisade) {
-        const days = durationDays ?? 1;
-        if (days < 3) {
-          setErrorMsg("Pendant la croisade des dirigeants, le jeûne doit durer au moins 3 jours.");
-          setStatus("error");
-          return;
-        }
-      }
       const subjects = rows
         .filter((r) => r.label.trim() !== "" || r.weekly_fast_subject_id)
         .map((r, i) => ({
@@ -241,7 +241,7 @@ export function PersonalEditor({
               type="date"
               className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none"
               value={fastEndDate}
-              min={fastDate}
+              min={minEndDate || fastDate}
               onChange={(e) => handleEndDateChange(e.target.value)}
             />
           </div>
@@ -282,7 +282,6 @@ export function PersonalEditor({
         <TotalsBar
           totalIntercessions={totals.intercessions}
           totalHours={totals.hours}
-          goalHours={1440}
         />
       </div>
 

@@ -270,7 +270,6 @@ export function TeamFastClient({
         <TotalsBar
           totalIntercessions={totals.intercessions}
           totalHours={totals.hours}
-          goalHours={1440}
         />
       </div>
 

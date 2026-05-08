@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { SubjectsEditor, SubjectRow } from "@/components/SubjectsEditor";
 import { isoWeeksInYear, getIsoWeek } from "@/lib/week";
@@ -223,6 +224,11 @@ export function DirigentFastClient({
             <p className="text-xs font-medium text-brand-600 mt-0.5">🏹 {croisade.name}</p>
           )}
         </div>
+        {croisade && (
+          <Link href={`/jeune/croisade/${croisade.id}`} className="btn-secondary text-xs text-center">
+            Voir mes jeûnes de la croisade →
+          </Link>
+        )}
       </div>
 
       <div className="card flex flex-col gap-4">
@@ -255,7 +261,6 @@ export function DirigentFastClient({
         <TotalsBar
           totalIntercessions={totals.intercessions}
           totalHours={totals.hours}
-          goalHours={1440}
         />
       </div>
 

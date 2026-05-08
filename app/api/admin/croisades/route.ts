@@ -79,44 +79,53 @@ export async function POST(req: Request) {
     const { id } = body;
     if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
 
-    // Get the croisade dates first
-    const { data: croisade, error: cErr } = await sb
-      .from("croisades")
-      .select("start_date, end_date")
-      .eq("id", id)
-      .single();
-    if (cErr || !croisade) return NextResponse.json({ error: "Croisade introuvable" }, { status: 404 });
+    // 1. Get croisade_subjects for this croisade
+    const { data: croisadeSubs, error: csErr } = await sb
+      .from("croisade_subjects")
+      .select("id")
+      .eq("croisade_id", id);
+    if (csErr) return NextResponse.json({ error: csErr.message }, { status: 500 });
+    const croisadeSubIds = (croisadeSubs ?? []).map((s: { id: string }) => s.id);
 
-    // Find fast_entries whose fast_date falls within the croisade period
-    let entriesQuery = sb
+    if (croisadeSubIds.length === 0) {
+      return NextResponse.json({ totalEntries: 0, totalMinutes: 0, totalIntercessions: 0, participants: 0 });
+    }
+
+    // 2. Get fast_entry_subjects linked to those croisade subjects
+    const { data: linkedSubs, error: lsErr } = await sb
+      .from("fast_entry_subjects")
+      .select("fast_entry_id, intercessions, hours, croisade_subject_id")
+      .in("croisade_subject_id", croisadeSubIds);
+    if (lsErr) return NextResponse.json({ error: lsErr.message }, { status: 500 });
+
+    const entryIds = [...new Set((linkedSubs ?? []).map((s: { fast_entry_id: string }) => s.fast_entry_id))];
+    if (entryIds.length === 0) {
+      return NextResponse.json({ totalEntries: 0, totalMinutes: 0, totalIntercessions: 0, participants: 0 });
+    }
+
+    // 3. Get fast_entries for those ids
+    const { data: entries, error: eErr } = await sb
       .from("fast_entries")
       .select("id, user_id, global_hours")
-      .gte("fast_date", croisade.start_date);
-    if (croisade.end_date) entriesQuery = entriesQuery.lte("fast_date", croisade.end_date);
-    const { data: entries, error: eErr } = await entriesQuery;
+      .in("id", entryIds);
     if (eErr) return NextResponse.json({ error: eErr.message }, { status: 500 });
 
-    const entryIds = (entries ?? []).map((e: { id: string }) => e.id);
     const participants = new Set((entries ?? []).map((e: { user_id: string }) => e.user_id)).size;
+    const entryMap = new Map((entries ?? []).map((e: { id: string; global_hours: number | null }) => [e.id, e.global_hours]));
+
+    // 4. Compute stats — for each entry use global_hours if set, else sum per-subject hours
+    let totalIntercessions = 0;
+    const perEntryHours = new Map<string, number>();
+    for (const s of (linkedSubs ?? [])) {
+      const ls = s as { fast_entry_id: string; intercessions: number; hours: number };
+      totalIntercessions += ls.intercessions ?? 0;
+      perEntryHours.set(ls.fast_entry_id, (perEntryHours.get(ls.fast_entry_id) ?? 0) + (ls.hours ?? 0));
+    }
 
     let totalMinutes = 0;
-    let totalIntercessions = 0;
-
-    if (entryIds.length > 0) {
-      const { data: subjects } = await sb
-        .from("fast_entry_subjects")
-        .select("intercessions, hours")
-        .in("fast_entry_id", entryIds);
-
-      (subjects ?? []).forEach((s: { intercessions: number; hours: number }) => {
-        totalIntercessions += s.intercessions ?? 0;
-        totalMinutes += (s.hours ?? 0) * 60;
-      });
-
-      // Also sum global_hours where set
-      (entries ?? []).forEach((e: { global_hours: number | null }) => {
-        if (e.global_hours != null) totalMinutes += e.global_hours * 60;
-      });
+    for (const entryId of entryIds) {
+      const gh = entryMap.get(entryId);
+      totalMinutes += (gh != null ? gh : (perEntryHours.get(entryId) ?? 0)) * 60;
     }
 
     return NextResponse.json({

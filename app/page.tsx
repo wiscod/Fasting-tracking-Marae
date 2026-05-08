@@ -56,14 +56,6 @@ export default async function HomePage() {
         </span>
       </Link>
 
-      {teamCroisade && (
-        <Link href={`/jeune/croisade/${teamCroisade.id}`} className="card flex flex-col gap-1 hover:border-brand-500">
-          <span className="text-xs uppercase tracking-wide text-brand-600">Mes jeûnes · {teamCroisade.name}</span>
-          <span className="text-lg font-semibold">Voir mes jeûnes de la croisade</span>
-          <span className="text-sm text-slate-500">Consulte tes jeûnes effectués pendant cette croisade.</span>
-        </Link>
-      )}
-
       <Link href="/jeune/perso" className="card flex flex-col gap-1 hover:border-brand-500">
         <span className="text-xs uppercase tracking-wide text-brand-600">Tous mes jeûnes</span>
         <span className="text-lg font-semibold">Mes jeûnes</span>
@@ -85,13 +77,6 @@ export default async function HomePage() {
               {dirigeantCroisade?.description ?? "Enregistre tes importunités et tes jeûnes en tant que dirigeant."}
             </span>
           </Link>
-          {dirigeantCroisade && (
-            <Link href={`/jeune/croisade/${dirigeantCroisade.id}`} className="card flex flex-col gap-1 hover:border-amber-500 border-amber-200">
-              <span className="text-xs uppercase tracking-wide text-amber-600">Mes jeûnes · {dirigeantCroisade.name}</span>
-              <span className="text-lg font-semibold">Voir mes jeûnes de la croisade</span>
-              <span className="text-sm text-slate-500">Consulte tes jeûnes effectués pendant cette croisade.</span>
-            </Link>
-          )}
         </>
       )}
     </main>
