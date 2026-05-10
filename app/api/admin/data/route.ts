@@ -220,6 +220,7 @@ export async function POST(req: Request) {
         userName,
         kind: e.kind,
         fastDate: e.fast_date,
+        fastEndDate: e.fast_end_date,
         globalMinutes: gm,
         updatedAt: e.updated_at,
         totalIntercessions: imp,

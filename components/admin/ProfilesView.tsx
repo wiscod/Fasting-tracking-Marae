@@ -269,6 +269,7 @@ type EntryLike = {
   entryId: string;
   kind: string;
   fastDate: string | null;
+  fastEndDate?: string | null;
   updatedAt: string;
   weekLabel: string | null;
   totalIntercessions: number;
@@ -297,6 +298,14 @@ function EntryCard({ entry: e, onDelete }: { entry: EntryLike; onDelete: (id: st
           </p>
         </div>
         <div className="flex items-center gap-3 text-right tabular-nums">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-slate-400">Jours</p>
+            <p className="text-sm font-bold text-slate-800">
+              {(e.fastDate && e.fastEndDate)
+                ? Math.max(1, Math.round((new Date(e.fastEndDate).getTime() - new Date(e.fastDate).getTime()) / 86400000) + 1)
+                : 1}
+            </p>
+          </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-400">Imp.</p>
             <p className="text-sm font-bold text-slate-800">{e.totalIntercessions}</p>
