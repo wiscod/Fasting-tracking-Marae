@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 
     const { data: entries, error } = await sb
       .from("fast_entries")
-      .select("id, user_id, kind, global_hours, updated_at")
+      .select("id, user_id, kind, global_hours, updated_at, fast_date, fast_end_date")
       .order("updated_at", { ascending: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     const cast = (entries ?? []) as FastEntry[];
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     // Aggregate fast stats per user
     const statsByUser = new Map<string, {
       totalFasts: number; totalTeamFasts: number; totalPersonalFasts: number;
-      totalImportunites: number; totalMinutes: number; lastSeen: string;
+      totalImportunites: number; totalMinutes: number; totalDays: number; lastSeen: string;
     }>();
     for (const e of cast) {
       const entrySubs = subsByEntry.get(e.id) ?? [];
@@ -124,6 +124,9 @@ export async function POST(req: Request) {
       const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
       const gm = e.global_hours != null ? Number(e.global_hours) : null;
       const min = gm != null && Number.isFinite(gm) ? gm : perSub;
+      const days = (e.fast_date && e.fast_end_date)
+        ? Math.max(1, Math.round((new Date(e.fast_end_date).getTime() - new Date(e.fast_date).getTime()) / 86400000) + 1)
+        : 1;
       const existing = statsByUser.get(e.user_id);
       if (existing) {
         existing.totalFasts += 1;
@@ -131,6 +134,7 @@ export async function POST(req: Request) {
         existing.totalPersonalFasts += e.kind === "personal" ? 1 : 0;
         existing.totalImportunites += imp;
         existing.totalMinutes += min;
+        existing.totalDays += days;
         if (e.updated_at > existing.lastSeen) existing.lastSeen = e.updated_at;
       } else {
         statsByUser.set(e.user_id, {
@@ -139,6 +143,7 @@ export async function POST(req: Request) {
           totalPersonalFasts: e.kind === "personal" ? 1 : 0,
           totalImportunites: imp,
           totalMinutes: min,
+          totalDays: days,
           lastSeen: e.updated_at,
         });
       }
@@ -156,6 +161,7 @@ export async function POST(req: Request) {
         totalPersonalFasts: stats?.totalPersonalFasts ?? 0,
         totalImportunites: stats?.totalImportunites ?? 0,
         totalMinutes: stats?.totalMinutes ?? 0,
+        totalDays: stats?.totalDays ?? 0,
         lastSeen: stats?.lastSeen ?? "",
       };
     });
@@ -191,7 +197,7 @@ export async function POST(req: Request) {
       list.push(s);
       subsByEntry.set(s.fast_entry_id, list);
     }
-    let totalImportunites = 0, totalMinutes = 0, totalTeamFasts = 0, totalPersonalFasts = 0;
+    let totalImportunites = 0, totalMinutes = 0, totalTeamFasts = 0, totalPersonalFasts = 0, totalDays = 0;
     const personalSubjectsSet = new Set<string>();
     const userName = fullName(profilesMap.get(body.userId));
     const mapped = cast.map((e) => {
@@ -200,7 +206,10 @@ export async function POST(req: Request) {
       const perSub = entrySubs.reduce((a, s) => a + Number(s.hours || 0), 0);
       const gm = e.global_hours != null ? Number(e.global_hours) : null;
       const min = gm != null && Number.isFinite(gm) ? gm : perSub;
-      totalImportunites += imp; totalMinutes += min;
+      const days = (e.fast_date && e.fast_end_date)
+        ? Math.max(1, Math.round((new Date(e.fast_end_date).getTime() - new Date(e.fast_date).getTime()) / 86400000) + 1)
+        : 1;
+      totalImportunites += imp; totalMinutes += min; totalDays += days;
       if (e.kind === "team") totalTeamFasts++; else {
         totalPersonalFasts++;
         for (const s of entrySubs) if (s.custom_label?.trim()) personalSubjectsSet.add(s.custom_label.trim());
@@ -212,6 +221,7 @@ export async function POST(req: Request) {
         userName,
         kind: e.kind,
         fastDate: e.fast_date,
+        fastEndDate: e.fast_end_date,
         globalMinutes: gm,
         updatedAt: e.updated_at,
         totalIntercessions: imp,
@@ -238,6 +248,7 @@ export async function POST(req: Request) {
         totalPersonalFasts,
         totalImportunites,
         totalMinutes,
+        totalDays,
         lastSeen: cast[0]?.updated_at ?? "",
       },
       entries: mapped,
