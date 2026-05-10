@@ -72,6 +72,7 @@ export async function POST(req: Request) {
         userName: fullName(profiles.get(e.user_id)),
         kind: e.kind,
         fastDate: e.fast_date,
+        fastEndDate: e.fast_end_date,
         globalMinutes: gm,
         updatedAt: e.updated_at,
         totalIntercessions,

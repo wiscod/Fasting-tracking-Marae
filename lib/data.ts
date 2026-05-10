@@ -346,6 +346,7 @@ export type WeeklyParticipant = {
   userName: string | null;
   kind: "team" | "personal";
   fastDate: string | null;
+  fastEndDate: string | null;
   globalMinutes: number | null;
   updatedAt: string;
   totalIntercessions: number;
