@@ -75,6 +75,7 @@ export function ProfilesView() {
               <p className="text-[10px] uppercase tracking-wider text-slate-400">Importunités</p>
               <p className="text-lg font-bold tabular-nums text-slate-800">{p.totalImportunites}</p>
               <p className="text-[10px] text-slate-500">{formatMinutes(p.totalMinutes)} de prière</p>
+              <p className="text-[10px] text-slate-400">{p.totalDays} j. de jeûne</p>
             </div>
           </div>
           <p className="mt-2 text-[10px] text-slate-400">
@@ -205,8 +206,9 @@ function PersonProfileView({
 
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-2">
         <Kpi label="Jeûnes" value={String(person.totalFasts)} />
+        <Kpi label="Jours" value={String(person.totalDays)} />
         <Kpi label="Importunités" value={String(person.totalImportunites)} />
         <Kpi label="Prière" value={formatMinutes(person.totalMinutes)} />
       </div>

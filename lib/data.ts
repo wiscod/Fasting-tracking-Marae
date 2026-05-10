@@ -368,6 +368,7 @@ export type PersonSummary = {
   totalPersonalFasts: number;
   totalImportunites: number;
   totalMinutes: number;
+  totalDays: number;
   lastSeen: string;
 };
 
