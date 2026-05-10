@@ -154,6 +154,7 @@ function ParticipantCard({
           <p className="mt-0.5 text-xs text-slate-500">
             {formatRelative(p.updatedAt)}
             {p.fastDate ? ` · ${formatDate(p.fastDate)}` : ""}
+            {" · "}<span className="font-semibold text-slate-700">{countDays(p.fastDate, p.fastEndDate)} j</span>
           </p>
         </div>
         <div className="flex items-center gap-3 text-right tabular-nums">
@@ -212,6 +213,14 @@ function Kpi({ label, value, color = "text-slate-800" }: { label: string; value:
 function formatDate(iso: string): string {
   try { return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }); }
   catch { return iso; }
+}
+
+function countDays(startIso: string | null, endIso: string | null): number {
+  if (!startIso) return 0;
+  if (!endIso) return 1;
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  return Math.max(1, Math.round((end - start) / 86400000) + 1);
 }
 
 function formatRelative(iso: string): string {

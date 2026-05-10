@@ -338,7 +338,7 @@ export function deleteEntryAdmin(entryId: string): Promise<void> {
   return fetchAdmin<void>("deleteEntry", { entryId });
 }
 
-// ─── Admin types (data fetched via API service_role) ─────────────────────────
+// ─── Admin types (data fetched via API service_role) ─────────────────────────────────────────────
 
 export type WeeklyParticipant = {
   entryId: string;
@@ -346,6 +346,7 @@ export type WeeklyParticipant = {
   userName: string | null;
   kind: "team" | "personal";
   fastDate: string | null;
+  fastEndDate: string | null;
   globalMinutes: number | null;
   updatedAt: string;
   totalIntercessions: number;
@@ -368,6 +369,7 @@ export type PersonSummary = {
   totalPersonalFasts: number;
   totalImportunites: number;
   totalMinutes: number;
+  totalDays: number;
   lastSeen: string;
 };
 
@@ -431,7 +433,7 @@ export function getWeeklyAggregates(
   });
 }
 
-// ─── Croisades ────────────────────────────────────────────────────────────────
+// ─── Croisades ────────────────────────────────────────────────────────────────────────────────
 
 export type CroisadeStats = {
   totalEntries: number;
