@@ -324,6 +324,42 @@ export async function savePersonalFast(args: {
   return finalEntry.data as FastEntry;
 }
 
+export type OverlappingFast = {
+  id: string;
+  title: string | null;
+  fast_date: string | null;
+  fast_end_date: string | null;
+};
+
+export async function checkOverlappingPersonalFasts(
+  fastDate: string,
+  fastEndDate: string | null,
+  excludeId?: string,
+): Promise<OverlappingFast[]> {
+  const sb = getSupabaseBrowser();
+  const userId = await getUserId();
+  const endDate = fastEndDate || fastDate;
+
+  let query = sb
+    .from("fast_entries")
+    .select("id, title, fast_date, fast_end_date")
+    .eq("user_id", userId)
+    .eq("kind", "personal")
+    .lte("fast_date", endDate)
+    .or(`fast_end_date.gte.${fastDate},fast_end_date.is.null`);
+
+  if (excludeId) query = query.neq("id", excludeId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // For entries without fast_end_date, treat end = start
+  return ((data ?? []) as OverlappingFast[]).filter((e) => {
+    const eEnd = e.fast_end_date || e.fast_date || fastDate;
+    return e.fast_date && e.fast_date <= endDate && eEnd >= fastDate;
+  });
+}
+
 export async function deletePersonalFast(id: string, createdAt: string): Promise<void> {
   const ageMs = Date.now() - new Date(createdAt).getTime();
   if (ageMs > 7 * 24 * 60 * 60 * 1000) {

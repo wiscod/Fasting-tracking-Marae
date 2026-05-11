@@ -11,14 +11,81 @@ import {
 import { LineChart, ChartCard } from "./MiniChart";
 import { formatMinutes } from "@/components/TotalsBar";
 
+function RegisterJeuneForm({ onSuccess }: { onSuccess: () => void }) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [discipleshipMaker, setDiscipleshipMaker] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/register-jeune", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName, lastName, phone, email, discipleshipMaker }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-2xl border border-brand-200 bg-brand-50 p-4 flex flex-col gap-3">
+      <h3 className="text-sm font-semibold text-brand-800">Nouveau jeune</h3>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Prénom *</label>
+          <input className="input mt-0.5 w-full" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+        </div>
+        <div>
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Nom</label>
+          <input className="input mt-0.5 w-full" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+        </div>
+      </div>
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Téléphone *</label>
+        <input className="input mt-0.5 w-full" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+      </div>
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Email *</label>
+        <input className="input mt-0.5 w-full" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      </div>
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Disciple-maker</label>
+        <input className="input mt-0.5 w-full" value={discipleshipMaker} onChange={(e) => setDiscipleshipMaker(e.target.value)} />
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <p className="text-[10px] text-slate-500">Un email d&apos;invitation sera envoyé à l&apos;adresse indiquée.</p>
+      <button type="submit" disabled={saving} className="btn-primary w-full">
+        {saving ? "Enregistrement…" : "Créer le compte"}
+      </button>
+    </form>
+  );
+}
+
 export function ProfilesView() {
   const [persons, setPersons] = useState<PersonSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
+  const [showRegister, setShowRegister] = useState(false);
 
-  useEffect(() => {
+  function reload() {
+    setLoading(true);
     getAllPersons().then(setPersons).finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <p className="text-center text-sm text-slate-500">Chargement…</p>;
 
@@ -37,7 +104,24 @@ export function ProfilesView() {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-slate-500">{persons.length} personne{persons.length > 1 ? "s" : ""} · triées par importunités</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-500">{persons.length} personne{persons.length > 1 ? "s" : ""} · triées par importunités</p>
+        <button
+          type="button"
+          onClick={() => setShowRegister((v) => !v)}
+          className="rounded-xl bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+        >
+          {showRegister ? "Annuler" : "+ Nouveau jeune"}
+        </button>
+      </div>
+      {showRegister && (
+        <RegisterJeuneForm
+          onSuccess={() => {
+            setShowRegister(false);
+            reload();
+          }}
+        />
+      )}
       {persons.map((p, i) => (
         <button
           key={p.userId}
