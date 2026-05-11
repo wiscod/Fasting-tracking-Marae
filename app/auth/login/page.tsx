@@ -33,7 +33,7 @@ export default function LoginPage() {
       } else {
         // No key yet (old account) — generate session-only key
         const dk = await generateDataKey();
-        await setSessionDataKey(dk);
+        setSessionDataKey(dk);
       }
     }
     setLoading(false);

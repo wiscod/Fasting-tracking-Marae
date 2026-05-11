@@ -2,7 +2,6 @@
 // Architecture: random data key per user, wrapped (encrypted) with a PBKDF2-derived key from the user's password.
 // The wrapped key is stored in profiles. The unwrapped data key lives in sessionStorage only.
 
-const SESSION_KEY = "enc_dk";
 const PBKDF2_ITERATIONS = 100_000;
 
 // ── Utilities ──────────────────────────────────────────────────────────────
@@ -65,26 +64,20 @@ export async function unwrapDataKey(wrappedB64: string, wrappingKey: CryptoKey):
   );
 }
 
-// ── Session storage ────────────────────────────────────────────────────────
+// ── Clé en mémoire uniquement (jamais persistée) ───────────────────────────
 
-export async function setSessionDataKey(dataKey: CryptoKey): Promise<void> {
-  const raw = await crypto.subtle.exportKey("raw", dataKey);
-  sessionStorage.setItem(SESSION_KEY, b64(raw));
+let _dataKey: CryptoKey | null = null;
+
+export function setSessionDataKey(dataKey: CryptoKey): void {
+  _dataKey = dataKey;
 }
 
-export async function getSessionDataKey(): Promise<CryptoKey | null> {
-  const stored = sessionStorage.getItem(SESSION_KEY);
-  if (!stored) return null;
-  try {
-    const raw = fromb64(stored);
-    return crypto.subtle.importKey("raw", raw.buffer as ArrayBuffer, { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-  } catch {
-    return null;
-  }
+export function getSessionDataKey(): CryptoKey | null {
+  return _dataKey;
 }
 
 export function clearSessionDataKey(): void {
-  sessionStorage.removeItem(SESSION_KEY);
+  _dataKey = null;
 }
 
 // ── Label encryption/decryption ────────────────────────────────────────────
@@ -128,7 +121,7 @@ export async function initKeyFromLogin(
 ): Promise<void> {
   const wrappingKey = await deriveWrappingKey(password, encSalt);
   const dataKey = await unwrapDataKey(encWrappedKey, wrappingKey);
-  await setSessionDataKey(dataKey);
+  setSessionDataKey(dataKey);
 }
 
 // Called after signup — generates key, returns salt+wrappedKey to save in profiles
@@ -137,7 +130,7 @@ export async function setupNewKey(password: string): Promise<{ salt: string; wra
   const wrappingKey = await deriveWrappingKey(password, salt);
   const dataKey = await generateDataKey();
   const wrappedKey = await wrapDataKey(dataKey, wrappingKey);
-  await setSessionDataKey(dataKey);
+  setSessionDataKey(dataKey);
   return { salt, wrappedKey, dataKey };
 }
 
@@ -153,7 +146,7 @@ export async function rewrapKey(
   const newSalt = await generateSalt();
   const newWrappingKey = await deriveWrappingKey(newPassword, newSalt);
   const newWrappedKey = await wrapDataKey(dataKey, newWrappingKey);
-  await setSessionDataKey(dataKey);
+  setSessionDataKey(dataKey);
   return { salt: newSalt, wrappedKey: newWrappedKey };
 }
 

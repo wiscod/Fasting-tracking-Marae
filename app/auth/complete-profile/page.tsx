@@ -51,7 +51,7 @@ export default function CompleteProfilePage() {
     }
     // Google users: session-only key (no password to derive from)
     const dk = await generateDataKey();
-    await setSessionDataKey(dk);
+    setSessionDataKey(dk);
     router.push("/");
     router.refresh();
   }

@@ -240,7 +240,7 @@ export async function getPersonalFast(
     .eq("fast_entry_id", entry.id)
     .order("position", { ascending: true });
   if (subErr) throw subErr;
-  const dataKey = await getSessionDataKey();
+  const dataKey = getSessionDataKey();
   const subjects = await Promise.all(((subs ?? []) as FastEntrySubject[]).map(async (s) => {
     if (s.custom_label && isEncrypted(s.custom_label) && dataKey) {
       return { ...s, custom_label: (await decryptLabel(s.custom_label, dataKey)) ?? "[Sujet chiffré]" };
@@ -305,7 +305,7 @@ export async function savePersonalFast(args: {
   if (del.error) throw del.error;
 
   if (args.subjects.length > 0) {
-    const dataKey = await getSessionDataKey();
+    const dataKey = getSessionDataKey();
     const rows = await Promise.all(args.subjects.map(async (s) => {
       let label = s.custom_label;
       if (label && dataKey) label = await encryptLabel(label, dataKey);
