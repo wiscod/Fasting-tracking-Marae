@@ -21,8 +21,16 @@ export function StatsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>("importunites");
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    const name = localStorage.getItem("jeunes_user_name");
+    setCurrentUserName(name);
+
+    const adminToken = localStorage.getItem("admin_token");
+    setIsAdmin(!!adminToken);
+
     fetch("/api/stats")
       .then((r) => r.json())
       .then(setStats)
@@ -99,7 +107,7 @@ export function StatsClient() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xl font-bold tabular-nums text-brand-600">#{i + 1}</span>
                 <span className="text-base font-semibold text-slate-800">{p.name}</span>
-                {p.isDirigent && (
+                {p.isDirigent && (currentUserName === "Edy" || isAdmin) && (
                   <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
                     Dirigeant
                   </span>
