@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     .update({ is_dirigeant: isDirigent })
     .eq("id", userId);
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

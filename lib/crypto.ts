@@ -2,7 +2,7 @@
 // Architecture: random data key per user, wrapped (encrypted) with a PBKDF2-derived key from the user's password.
 // The wrapped key is stored in profiles. The unwrapped data key lives in sessionStorage only.
 
-const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_ITERATIONS = 600_000;
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 

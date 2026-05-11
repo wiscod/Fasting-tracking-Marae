@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       .from("croisades")
       .select("*")
       .order("start_date", { ascending: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     return NextResponse.json(data);
   }
 
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       .insert({ name, description: description ?? null, start_date, end_date: end_date ?? null, is_dirigeant: is_dirigeant ?? false })
       .select("*")
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     return NextResponse.json(data);
   }
 
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       .eq("id", id)
       .select("*")
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     return NextResponse.json(data);
   }
 
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const { id } = body;
     if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
     const { error } = await sb.from("croisades").update({ is_active: false }).eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     return NextResponse.json({});
   }
 
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     const { id } = body;
     if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
     const { error } = await sb.from("croisades").update({ is_active: true }).eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     return NextResponse.json({});
   }
 
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       .from("croisade_subjects")
       .select("id")
       .eq("croisade_id", id);
-    if (csErr) return NextResponse.json({ error: csErr.message }, { status: 500 });
+    if (csErr) { console.error(csErr); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     const croisadeSubIds = (croisadeSubs ?? []).map((s: { id: string }) => s.id);
 
     if (croisadeSubIds.length === 0) {
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       .from("fast_entry_subjects")
       .select("fast_entry_id, intercessions, hours, croisade_subject_id")
       .in("croisade_subject_id", croisadeSubIds);
-    if (lsErr) return NextResponse.json({ error: lsErr.message }, { status: 500 });
+    if (lsErr) { console.error(lsErr); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
 
     const entryIds = [...new Set((linkedSubs ?? []).map((s: { fast_entry_id: string }) => s.fast_entry_id))];
     if (entryIds.length === 0) {
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
       .from("fast_entries")
       .select("id, user_id, global_hours")
       .in("id", entryIds);
-    if (eErr) return NextResponse.json({ error: eErr.message }, { status: 500 });
+    if (eErr) { console.error(eErr); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
 
     const participants = new Set((entries ?? []).map((e: { user_id: string }) => e.user_id)).size;
     const entryMap = new Map((entries ?? []).map((e: { id: string; global_hours: number | null }) => [e.id, e.global_hours]));
@@ -145,7 +145,7 @@ export async function POST(req: Request) {
       .select("*")
       .eq("croisade_id", id)
       .order("position", { ascending: true });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     return NextResponse.json(data ?? []);
   }
 
@@ -154,11 +154,11 @@ export async function POST(req: Request) {
     const { id, subjects } = body;
     if (!id) return NextResponse.json({ error: "id manquant" }, { status: 400 });
     const { error: delErr } = await sb.from("croisade_subjects").delete().eq("croisade_id", id);
-    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+    if (delErr) { console.error(delErr); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     if (subjects && subjects.length > 0) {
       const rows = subjects.map((s) => ({ croisade_id: id, position: s.position, label: s.label }));
       const { error: insErr } = await sb.from("croisade_subjects").insert(rows);
-      if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+      if (insErr) { console.error(insErr); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     }
     return NextResponse.json({ ok: true });
   }

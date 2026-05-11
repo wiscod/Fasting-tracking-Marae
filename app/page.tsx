@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getIsoWeek } from "@/lib/week";
 import { getSupabaseServer } from "@/lib/supabaseServer";
+import { LogoutButton } from "@/components/LogoutButton";
 import type { Croisade } from "@/lib/types";
 
 export default async function HomePage() {
@@ -39,9 +40,7 @@ export default async function HomePage() {
           <p className="text-sm text-slate-500">Bonjour{firstName ? `, ${firstName}` : ""}</p>
           <h1 className="text-2xl font-bold">Mes jeûnes</h1>
         </div>
-        <form action="/auth/logout" method="post">
-          <button type="submit" className="text-xs text-slate-500 hover:text-slate-700">Déconnexion</button>
-        </form>
+        <LogoutButton />
       </div>
 
       <Link href="/jeune/equipe" className="card flex flex-col gap-1 hover:border-brand-500">

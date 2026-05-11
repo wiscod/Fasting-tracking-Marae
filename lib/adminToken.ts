@@ -10,7 +10,7 @@ export async function computeAdminToken(): Promise<string> {
   const sig = await crypto.subtle.sign(
     "HMAC",
     key,
-    enc.encode(process.env.ADMIN_PASSWORD ?? ""),
+    enc.encode("admin-session-token"),
   );
   const bytes = new Uint8Array(sig);
   let bin = "";

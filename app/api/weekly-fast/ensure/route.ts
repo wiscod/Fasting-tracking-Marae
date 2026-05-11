@@ -9,8 +9,14 @@ export async function POST(req: Request) {
   }
   const body = await req.json();
   const { year, week, isDirigent } = body;
-  if (typeof year !== "number" || typeof week !== "number") {
-    return NextResponse.json({ error: "year/week requis" }, { status: 400 });
+  const currentYear = new Date().getFullYear();
+  if (
+    typeof year !== "number" || typeof week !== "number" ||
+    !Number.isInteger(year) || !Number.isInteger(week) ||
+    year < currentYear - 1 || year > currentYear + 1 ||
+    week < 1 || week > 53
+  ) {
+    return NextResponse.json({ error: "year/week invalide" }, { status: 400 });
   }
   const isDir = isDirigent === true;
 
@@ -23,7 +29,7 @@ export async function POST(req: Request) {
     .eq("is_dirigeant", isDir)
     .maybeSingle();
   if (existing.error) {
-    return NextResponse.json({ error: existing.error.message }, { status: 500 });
+    console.error(existing.error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
   if (existing.data) {
     return NextResponse.json({ weeklyFast: existing.data });
@@ -37,7 +43,7 @@ export async function POST(req: Request) {
     .select("*")
     .single();
   if (created.error) {
-    return NextResponse.json({ error: created.error.message }, { status: 500 });
+    console.error(created.error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
   return NextResponse.json({ weeklyFast: created.data });
 }

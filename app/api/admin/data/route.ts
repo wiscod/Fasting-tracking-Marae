@@ -8,6 +8,16 @@ import type {
 
 // Middleware already gates /api/admin/* via the HMAC cookie.
 
+const VALID_ACTIONS = new Set([
+  "getWeeklyParticipants",
+  "getAllPersons",
+  "getPersonHistory",
+  "getWeeklyAggregates",
+  "deleteEntry",
+]);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type Body = {
   action: string;
   weeklyFastId?: string;
@@ -21,6 +31,18 @@ type Body = {
 
 export async function POST(req: Request) {
   const body = (await req.json()) as Body;
+
+  if (typeof body.action !== "string" || !VALID_ACTIONS.has(body.action)) {
+    return NextResponse.json({ error: "Action invalide" }, { status: 400 });
+  }
+
+  // Validate optional UUID fields when present
+  for (const field of ["weeklyFastId", "userId", "entryId"] as const) {
+    if (body[field] !== undefined && !UUID_RE.test(body[field]!)) {
+      return NextResponse.json({ error: `${field} invalide` }, { status: 400 });
+    }
+  }
+
   const sb = getSupabaseService();
 
   // Map of user_id → profile (first_name, last_name, phone, is_dirigeant)
@@ -47,7 +69,7 @@ export async function POST(req: Request) {
       .select("*")
       .eq("weekly_fast_id", body.weeklyFastId)
       .order("updated_at", { ascending: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     const cast = (entries ?? []) as FastEntry[];
     const ids = cast.map((e) => e.id);
     const { data: subs } = ids.length
@@ -88,18 +110,17 @@ export async function POST(req: Request) {
   }
 
   if (body.action === "getAllPersons") {
-    // Start from profiles so all registered users appear, even with no fasts
     const { data: allProfiles, error: profErr } = await sb
       .from("profiles")
       .select("id, first_name, last_name, phone, is_dirigeant")
       .order("created_at", { ascending: true });
-    if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
+    if (profErr) { console.error(profErr); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
 
     const { data: entries, error } = await sb
       .from("fast_entries")
       .select("id, user_id, kind, global_hours, updated_at")
       .order("updated_at", { ascending: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     const cast = (entries ?? []) as FastEntry[];
     const ids = cast.map((e) => e.id);
     const { data: subs } = ids.length
@@ -112,7 +133,6 @@ export async function POST(req: Request) {
       subsByEntry.set(s.fast_entry_id, list);
     }
 
-    // Aggregate fast stats per user
     const statsByUser = new Map<string, {
       totalFasts: number; totalTeamFasts: number; totalPersonalFasts: number;
       totalImportunites: number; totalMinutes: number; lastSeen: string;
@@ -170,7 +190,7 @@ export async function POST(req: Request) {
       .eq("user_id", body.userId)
       .order("fast_date", { ascending: false, nullsFirst: false })
       .order("updated_at", { ascending: false });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     const cast = (entries ?? []) as FastEntry[];
     const ids = cast.map((e) => e.id);
     const [subsRes, wfRes, profilesMap] = await Promise.all([
@@ -246,11 +266,17 @@ export async function POST(req: Request) {
 
   if (body.action === "getWeeklyAggregates") {
     const { fromYear, fromWeek, toYear, toWeek } = body;
-    if ([fromYear, fromWeek, toYear, toWeek].some((v) => typeof v !== "number")) {
+    if ([fromYear, fromWeek, toYear, toWeek].some((v) => typeof v !== "number" || !Number.isInteger(v))) {
       return NextResponse.json({ error: "Plage requise" }, { status: 400 });
     }
+    const currentYear = new Date().getFullYear();
+    if (
+      fromYear! < currentYear - 5 || toYear! > currentYear + 1 ||
+      fromWeek! < 1 || fromWeek! > 53 || toWeek! < 1 || toWeek! > 53
+    ) {
+      return NextResponse.json({ error: "Plage invalide" }, { status: 400 });
+    }
 
-    // Helper: compute ISO year+week from a date string
     function isoWeekOf(dateStr: string): { year: number; week: number } {
       const d = new Date(dateStr + "T00:00:00Z");
       const day = d.getUTCDay() || 7;
@@ -260,7 +286,6 @@ export async function POST(req: Request) {
       return { year: d.getUTCFullYear(), week };
     }
 
-    // Helper: Monday date string of a given ISO year+week
     function weekStartDate(y: number, w: number): string {
       const jan4 = new Date(Date.UTC(y, 0, 4));
       const startOfW1 = new Date(jan4);
@@ -278,12 +303,10 @@ export async function POST(req: Request) {
     };
 
     const dateFrom = weekStartDate(fromYear!, fromWeek!);
-    // Sunday of last week = Monday + 6 days
     const lastMonday = new Date(weekStartDate(toYear!, toWeek!) + "T00:00:00Z");
     lastMonday.setUTCDate(lastMonday.getUTCDate() + 6);
     const dateTo = lastMonday.toISOString().slice(0, 10);
 
-    // Fetch team fasts via weekly_fast_id
     const { data: wfs } = await sb.from("weekly_fasts").select("id, year, week");
     const wfsInRange = ((wfs ?? []) as WeeklyFast[]).filter((wf) => inRange(wf.year, wf.week));
     const wfIds = wfsInRange.map((wf) => wf.id);
@@ -358,7 +381,7 @@ export async function POST(req: Request) {
     if (!body.entryId) return NextResponse.json({ error: "entryId requis" }, { status: 400 });
     await sb.from("fast_entry_subjects").delete().eq("fast_entry_id", body.entryId);
     const { error } = await sb.from("fast_entries").delete().eq("id", body.entryId);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Erreur serveur" }, { status: 500 }); }
     return NextResponse.json({ ok: true });
   }
 

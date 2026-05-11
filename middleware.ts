@@ -1,5 +1,25 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+function buildCspHeader(nonce: string): string {
+  const isProd = process.env.NODE_ENV === "production";
+  // In dev, keep unsafe-eval for Next.js HMR. In prod, use strict nonce + strict-dynamic.
+  const scriptSrc = isProd
+    ? `'nonce-${nonce}' 'strict-dynamic'`
+    : `'nonce-${nonce}' 'unsafe-eval' 'unsafe-inline'`;
+  return [
+    "default-src 'self'",
+    `script-src 'self' ${scriptSrc}`,
+    "style-src 'self' 'unsafe-inline'",
+    `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://*.supabase.co"} wss://*.supabase.co https://accounts.google.com`,
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "frame-src 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
 import { createServerClient } from "@supabase/ssr";
 
 async function computeAdminToken(): Promise<string> {
@@ -14,7 +34,7 @@ async function computeAdminToken(): Promise<string> {
   const sig = await crypto.subtle.sign(
     "HMAC",
     key,
-    enc.encode(process.env.ADMIN_PASSWORD ?? ""),
+    enc.encode("admin-session-token"),
   );
   const bytes = new Uint8Array(sig);
   let bin = "";
@@ -22,8 +42,26 @@ async function computeAdminToken(): Promise<string> {
   return btoa(bin);
 }
 
+function applySecurityHeaders(response: NextResponse, nonce: string): NextResponse {
+  const csp = buildCspHeader(nonce);
+  response.headers.set("Content-Security-Policy", csp);
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+  return response;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+
+  // Forward nonce to the app so layouts can use it on <Script nonce={nonce}>
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
 
   // ── Admin gate (HMAC cookie) ──
   const isAdminPage = pathname.startsWith("/admin") && pathname !== "/admin/login";
@@ -35,16 +73,18 @@ export async function middleware(request: NextRequest) {
       if (isAdminApi) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
       return NextResponse.redirect(new URL("/admin/login", request.url));
     }
-    return NextResponse.next();
+    return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), nonce);
   }
 
   // ── User auth gate (Supabase session) for / and /jeune/* ──
   const isProtected =
     pathname === "/" ||
     pathname.startsWith("/jeune");
-  if (!isProtected) return NextResponse.next();
+  if (!isProtected) {
+    return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), nonce);
+  }
 
-  const response = NextResponse.next();
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
   const sb = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -79,14 +119,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/complete-profile", request.url));
   }
 
-  return response;
+  return applySecurityHeaders(response, nonce);
 }
 
 export const config = {
   matcher: [
-    "/",
-    "/admin/:path*",
-    "/api/admin/:path*",
-    "/jeune/:path*",
+    // Apply to all routes except Next.js internals and static files
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
