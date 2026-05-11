@@ -17,6 +17,12 @@ type Body = {
   fromWeek?: number;
   toYear?: number;
   toWeek?: number;
+  title?: string;
+  fastDate?: string;
+  fastEndDate?: string | null;
+  fastType?: string;
+  intercessions?: number;
+  globalHours?: number | null;
 };
 
 export async function POST(req: Request) {
@@ -262,7 +268,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Plage requise" }, { status: 400 });
     }
 
-    // Helper: compute ISO year+week from a date string
     function isoWeekOf(dateStr: string): { year: number; week: number } {
       const d = new Date(dateStr + "T00:00:00Z");
       const day = d.getUTCDay() || 7;
@@ -272,7 +277,6 @@ export async function POST(req: Request) {
       return { year: d.getUTCFullYear(), week };
     }
 
-    // Helper: Monday date string of a given ISO year+week
     function weekStartDate(y: number, w: number): string {
       const jan4 = new Date(Date.UTC(y, 0, 4));
       const startOfW1 = new Date(jan4);
@@ -290,12 +294,10 @@ export async function POST(req: Request) {
     };
 
     const dateFrom = weekStartDate(fromYear!, fromWeek!);
-    // Sunday of last week = Monday + 6 days
     const lastMonday = new Date(weekStartDate(toYear!, toWeek!) + "T00:00:00Z");
     lastMonday.setUTCDate(lastMonday.getUTCDate() + 6);
     const dateTo = lastMonday.toISOString().slice(0, 10);
 
-    // Fetch team fasts via weekly_fast_id
     const { data: wfs } = await sb.from("weekly_fasts").select("id, year, week");
     const wfsInRange = ((wfs ?? []) as WeeklyFast[]).filter((wf) => inRange(wf.year, wf.week));
     const wfIds = wfsInRange.map((wf) => wf.id);
@@ -364,6 +366,40 @@ export async function POST(req: Request) {
     return NextResponse.json(
       [...aggMap.values()].sort((a, b) => (a.year * 100 + a.week) - (b.year * 100 + b.week)),
     );
+  }
+
+  if (body.action === "createEntryForUser") {
+    if (!body.userId) return NextResponse.json({ error: "userId requis" }, { status: 400 });
+    if (!body.fastDate) return NextResponse.json({ error: "fastDate requis" }, { status: 400 });
+
+    const { data: entry, error: entryErr } = await sb
+      .from("fast_entries")
+      .insert({
+        user_id: body.userId,
+        kind: "personal",
+        title: body.title ?? "Jeûne personnel",
+        fast_date: body.fastDate,
+        fast_end_date: body.fastEndDate ?? null,
+        fast_type: body.fastType ?? "complet",
+        in_team_fast: false,
+        weekly_fast_id: null,
+        global_hours: body.globalHours ?? null,
+      })
+      .select("id")
+      .single();
+    if (entryErr) return NextResponse.json({ error: entryErr.message }, { status: 500 });
+
+    if (body.intercessions && body.intercessions > 0) {
+      const { error: subErr } = await sb.from("fast_entry_subjects").insert({
+        fast_entry_id: entry.id,
+        intercessions: body.intercessions,
+        hours: body.globalHours ?? 0,
+        position: 0,
+      });
+      if (subErr) return NextResponse.json({ error: subErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, entryId: entry.id });
   }
 
   if (body.action === "deleteEntry") {

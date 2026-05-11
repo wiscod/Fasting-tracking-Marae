@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import { SubjectsEditor, SubjectRow } from "@/components/SubjectsEditor";
 import { TotalsBar } from "@/components/TotalsBar";
 import {
+  checkOverlappingPersonalFasts,
   deletePersonalFast,
   getActiveCroisade,
   getPersonalFast,
   savePersonalFast,
+  type OverlappingFast,
 } from "@/lib/data";
 import type { Croisade } from "@/lib/types";
 
@@ -43,6 +45,7 @@ export function PersonalEditor({
   const [rows, setRows] = useState<SubjectRow[]>([]);
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [dirigeantCroisade, setDirigeantCroisade] = useState<Croisade | null>(null);
+  const [overlapConflicts, setOverlapConflicts] = useState<OverlappingFast[]>([]);
 
   useEffect(() => {
     if (isDirigent) {
@@ -128,10 +131,23 @@ export function PersonalEditor({
     }
   }
 
-  async function handleSave() {
+  async function handleSave(skipOverlapCheck = false) {
     setStatus("saving");
     setErrorMsg(null);
+    setOverlapConflicts([]);
     try {
+      if (!skipOverlapCheck && fastDate) {
+        const overlaps = await checkOverlappingPersonalFasts(
+          fastDate,
+          fastEndDate || null,
+          mode === "edit" ? entryId : undefined,
+        );
+        if (overlaps.length > 0) {
+          setOverlapConflicts(overlaps);
+          setStatus("ready");
+          return;
+        }
+      }
       const subjects = rows
         .filter((r) => r.label.trim() !== "" || r.weekly_fast_subject_id)
         .map((r, i) => ({
@@ -285,10 +301,68 @@ export function PersonalEditor({
         />
       </div>
 
+      {overlapConflicts.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex flex-col gap-3">
+          <p className="text-sm font-semibold text-amber-800">
+            ⚠️ Chevauchement de dates détecté
+          </p>
+          <p className="text-xs text-amber-700">
+            {overlapConflicts.length === 1
+              ? "Un jeûne existant chevauche cette période :"
+              : `${overlapConflicts.length} jeûnes existants chevauchent cette période :`}
+          </p>
+          <ul className="flex flex-col gap-1">
+            {overlapConflicts.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-2 text-xs text-amber-800">
+                <span className="font-medium">
+                  {c.title || "Jeûne personnel"}{" "}
+                  <span className="font-normal text-amber-600">
+                    ({c.fast_date}{c.fast_end_date && c.fast_end_date !== c.fast_date ? ` → ${c.fast_end_date}` : ""})
+                  </span>
+                </span>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/jeune/perso/${c.id}`)}
+                    className="rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-800 hover:bg-amber-200"
+                  >
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await deletePersonalFast(c.id, new Date().toISOString());
+                        setOverlapConflicts((prev) => prev.filter((x) => x.id !== c.id));
+                      } catch {
+                        setErrorMsg("Impossible de supprimer ce jeûne (plus de 7 jours).");
+                      }
+                    }}
+                    className="rounded-lg bg-red-100 px-2 py-1 text-[10px] font-semibold text-red-700 hover:bg-red-200"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[10px] text-amber-600">
+            Supprime ou modifie le(s) conflit(s), puis réessaie d&apos;enregistrer.
+          </p>
+          <button
+            type="button"
+            onClick={() => { setOverlapConflicts([]); handleSave(true); }}
+            className="text-xs text-amber-700 underline self-start"
+          >
+            Ignorer et enregistrer quand même
+          </button>
+        </div>
+      )}
+
       <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
         <button
           type="button"
-          onClick={handleSave}
+          onClick={() => handleSave()}
           disabled={status === "saving"}
           className="btn-primary w-full"
         >

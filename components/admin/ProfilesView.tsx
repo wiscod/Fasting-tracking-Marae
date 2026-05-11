@@ -11,14 +11,170 @@ import {
 import { LineChart, ChartCard } from "./MiniChart";
 import { formatMinutes } from "@/components/TotalsBar";
 
+const FAST_TYPES = [
+  { value: "complet", label: "Complet" },
+  { value: "partiel", label: "Partiel" },
+  { value: "absolu", label: "Absolu" },
+] as const;
+
+function AdminFastForm({
+  userId,
+  onSuccess,
+  onCancel,
+}: {
+  userId: string;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [title, setTitle] = useState("");
+  const [fastDate, setFastDate] = useState(today);
+  const [fastEndDate, setFastEndDate] = useState("");
+  const [fastType, setFastType] = useState<"complet" | "partiel" | "absolu">("complet");
+  const [intercessions, setIntercessions] = useState("");
+  const [hours, setHours] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "createEntryForUser",
+          userId,
+          title: title.trim() || "Jeûne personnel",
+          fastDate,
+          fastEndDate: fastEndDate || null,
+          fastType,
+          intercessions: intercessions ? Number(intercessions) : 0,
+          globalHours: hours ? Number(hours) : null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erreur");
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-2xl border border-brand-200 bg-brand-50 p-4 flex flex-col gap-3">
+      <h3 className="text-sm font-semibold text-brand-800">Nouveau jeûne</h3>
+
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Titre</label>
+        <input
+          className="input mt-0.5 w-full"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Jeûne personnel"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Début *</label>
+          <input
+            type="date"
+            className="input mt-0.5 w-full"
+            value={fastDate}
+            onChange={(e) => {
+              setFastDate(e.target.value);
+              if (fastEndDate && e.target.value > fastEndDate) setFastEndDate(e.target.value);
+            }}
+            required
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Fin</label>
+          <input
+            type="date"
+            className="input mt-0.5 w-full"
+            value={fastEndDate}
+            min={fastDate}
+            onChange={(e) => setFastEndDate(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Type</label>
+        <div className="mt-1 flex gap-2">
+          {FAST_TYPES.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setFastType(t.value)}
+              className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition-colors ${
+                fastType === t.value
+                  ? "bg-brand-600 text-white"
+                  : "bg-white border border-slate-200 text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Importunités</label>
+          <input
+            type="number"
+            min={0}
+            className="input mt-0.5 w-full"
+            value={intercessions}
+            onChange={(e) => setIntercessions(e.target.value)}
+            placeholder="0"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Minutes prière</label>
+          <input
+            type="number"
+            min={0}
+            className="input mt-0.5 w-full"
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            placeholder="0"
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
+
+      <div className="flex gap-2">
+        <button type="button" onClick={onCancel} className="btn-secondary flex-1">
+          Annuler
+        </button>
+        <button type="submit" disabled={saving} className="btn-primary flex-1">
+          {saving ? "Enregistrement…" : "Enregistrer"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 export function ProfilesView() {
   const [persons, setPersons] = useState<PersonSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
 
-  useEffect(() => {
+  function reload() {
+    setLoading(true);
     getAllPersons().then(setPersons).finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { reload(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <p className="text-center text-sm text-slate-500">Chargement…</p>;
 
@@ -99,14 +255,18 @@ function PersonProfileView({
   const [loading, setLoading] = useState(true);
   const [roleLoading, setRoleLoading] = useState(false);
   const [isDirigent, setIsDirigent] = useState(false);
+  const [showFastForm, setShowFastForm] = useState(false);
 
-  useEffect(() => {
+  function loadHistory() {
+    setLoading(true);
     getPersonHistory(deviceId).then((h) => {
       setHistory(h);
       setEntries(h.entries);
       setIsDirigent(h.person.isDirigent);
     }).finally(() => setLoading(false));
-  }, [deviceId]);
+  }
+
+  useEffect(() => { loadHistory(); }, [deviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDeleteEntry(entryId: string) {
     if (!confirm("Supprimer cette entrée ?")) return;
@@ -145,9 +305,8 @@ function PersonProfileView({
 
   const { person, personalSubjects } = history;
 
-  // Build chart data from entries (chronological, last 12)
   const chronoEntries = [...entries].reverse().slice(-12);
-  const impChartData = chronoEntries.map((e, i) => ({
+  const impChartData = chronoEntries.map((e) => ({
     label: e.weekLabel ? e.weekLabel.replace(" (", "\n(") : formatDateShort(e.fastDate ?? e.updatedAt),
     value: e.totalIntercessions,
   }));
@@ -161,7 +320,6 @@ function PersonProfileView({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Back button */}
       <button type="button" onClick={onBack} className="flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700">
         ← Tous les profils
       </button>
@@ -193,7 +351,7 @@ function PersonProfileView({
         <div className="mt-3 flex flex-wrap gap-2">
           {person.totalTeamFasts > 0 && (
             <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-              {person.totalTeamFasts} jeûne{person.totalTeamFasts > 1 ? "s" : ""} d'équipe
+              {person.totalTeamFasts} jeûne{person.totalTeamFasts > 1 ? "s" : ""} d&apos;équipe
             </span>
           )}
           {person.totalPersonalFasts > 0 && (
@@ -203,7 +361,6 @@ function PersonProfileView({
           )}
         </div>
       </div>
-
 
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-2">
@@ -242,21 +399,43 @@ function PersonProfileView({
         </section>
       )}
 
-      {/* Team fasts history */}
-      {teamEntries.length > 0 && (
-        <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">Jeûnes d'équipe ({teamEntries.length})</h3>
-          {teamEntries.map((e) => (
-            <EntryCard key={e.entryId} entry={e} onDelete={handleDeleteEntry} />
-          ))}
-        </section>
+      {/* Admin fast creation */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-700">Jeûnes personnels ({personalEntries.length})</h3>
+        <button
+          type="button"
+          onClick={() => setShowFastForm((v) => !v)}
+          className="rounded-xl bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700"
+        >
+          {showFastForm ? "Annuler" : "+ Nouveau jeûne"}
+        </button>
+      </div>
+
+      {showFastForm && (
+        <AdminFastForm
+          userId={person.userId}
+          onSuccess={() => {
+            setShowFastForm(false);
+            loadHistory();
+          }}
+          onCancel={() => setShowFastForm(false)}
+        />
       )}
 
       {/* Personal fasts history */}
       {personalEntries.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">Jeûnes personnels ({personalEntries.length})</h3>
           {personalEntries.map((e) => (
+            <EntryCard key={e.entryId} entry={e} onDelete={handleDeleteEntry} />
+          ))}
+        </section>
+      )}
+
+      {/* Team fasts history */}
+      {teamEntries.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h3 className="text-sm font-semibold text-slate-700">Jeûnes d&apos;équipe ({teamEntries.length})</h3>
+          {teamEntries.map((e) => (
             <EntryCard key={e.entryId} entry={e} onDelete={handleDeleteEntry} />
           ))}
         </section>

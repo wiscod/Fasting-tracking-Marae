@@ -64,6 +64,14 @@ export default async function HomePage() {
         </span>
       </Link>
 
+      <Link href="/jeune/stats" className="card flex flex-col gap-1 hover:border-brand-500">
+        <span className="text-xs uppercase tracking-wide text-brand-600">Classement</span>
+        <span className="text-lg font-semibold">Statistiques du groupe</span>
+        <span className="text-sm text-slate-500">
+          Importunités, jours de jeûne et temps de prière de tous les participants.
+        </span>
+      </Link>
+
       {isDirigent && (
         <>
           <Link href="/jeune/dirigeant" className="card flex flex-col gap-1 hover:border-amber-500 border-amber-200">
