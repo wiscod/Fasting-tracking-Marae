@@ -32,7 +32,7 @@ export async function GET() {
   }
 
   const statsByUser = new Map<string, {
-    totalFasts: number; totalImportunites: number; totalMinutes: number; totalDays: number;
+    totalFasts: number; totalImportunites: number; totalMinutes: number; totalDays: number; longFasts: number;
   }>();
 
   for (const e of cast) {
@@ -44,14 +44,16 @@ export async function GET() {
     const days = e.fast_date && e.fast_end_date
       ? Math.max(1, Math.round((new Date(e.fast_end_date).getTime() - new Date(e.fast_date).getTime()) / 86400000) + 1)
       : 1;
+    const isLongFast = days > 3 ? 1 : 0;
     const existing = statsByUser.get(e.user_id);
     if (existing) {
       existing.totalFasts += 1;
       existing.totalImportunites += imp;
       existing.totalMinutes += min;
       existing.totalDays += days;
+      existing.longFasts += isLongFast;
     } else {
-      statsByUser.set(e.user_id, { totalFasts: 1, totalImportunites: imp, totalMinutes: min, totalDays: days });
+      statsByUser.set(e.user_id, { totalFasts: 1, totalImportunites: imp, totalMinutes: min, totalDays: days, longFasts: isLongFast });
     }
   }
 
@@ -66,6 +68,7 @@ export async function GET() {
       totalImportunites: stats?.totalImportunites ?? 0,
       totalMinutes: stats?.totalMinutes ?? 0,
       totalDays: stats?.totalDays ?? 0,
+      longFasts: stats?.longFasts ?? 0,
     };
   });
 

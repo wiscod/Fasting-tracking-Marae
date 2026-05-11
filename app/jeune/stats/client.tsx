@@ -11,12 +11,16 @@ type PersonStat = {
   totalImportunites: number;
   totalMinutes: number;
   totalDays: number;
+  longFasts: number;
 };
+
+type SortBy = "importunites" | "minutes" | "longfasts";
 
 export function StatsClient() {
   const [stats, setStats] = useState<PersonStat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>("importunites");
 
   useEffect(() => {
     fetch("/api/stats")
@@ -30,12 +34,63 @@ export function StatsClient() {
   if (error) return <p className="text-center text-sm text-red-500">{error}</p>;
   if (stats.length === 0) return <p className="text-center text-sm text-slate-500">Aucune donnée.</p>;
 
-  const withActivity = stats.filter((s) => s.totalFasts > 0);
-  const withoutActivity = stats.filter((s) => s.totalFasts === 0);
+  const sorted = [...stats].sort((a, b) => {
+    switch (sortBy) {
+      case "minutes":
+        return b.totalMinutes - a.totalMinutes;
+      case "longfasts":
+        return b.longFasts - a.longFasts || b.totalImportunites - a.totalImportunites;
+      default:
+        return b.totalImportunites - a.totalImportunites;
+    }
+  });
+
+  const withActivity = sorted.filter((s) => s.totalFasts > 0);
+  const withoutActivity = sorted.filter((s) => s.totalFasts === 0);
+
+  const sortLabels: Record<SortBy, string> = {
+    importunites: "importunités",
+    minutes: "heures de prière",
+    longfasts: "jeûnes > 3j",
+  };
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs text-slate-500">{stats.length} participant{stats.length > 1 ? "s" : ""} · classés par importunités</p>
+      <div className="flex flex-col gap-2">
+        <p className="text-xs text-slate-500">{stats.length} participant{stats.length > 1 ? "s" : ""} · classés par {sortLabels[sortBy]}</p>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setSortBy("importunites")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              sortBy === "importunites"
+                ? "bg-brand-600 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Importunités
+          </button>
+          <button
+            onClick={() => setSortBy("minutes")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              sortBy === "minutes"
+                ? "bg-brand-600 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Heures de prière
+          </button>
+          <button
+            onClick={() => setSortBy("longfasts")}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              sortBy === "longfasts"
+                ? "bg-brand-600 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Jeûnes &gt; 3j
+          </button>
+        </div>
+      </div>
 
       {withActivity.map((p, i) => (
         <div key={p.userId} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -54,6 +109,12 @@ export function StatsClient() {
                 <span className="text-[10px] text-slate-500">{p.totalFasts} jeûne{p.totalFasts > 1 ? "s" : ""}</span>
                 <span className="text-[10px] text-slate-400">·</span>
                 <span className="text-[10px] text-slate-500">{p.totalDays} j. de jeûne</span>
+                {p.longFasts > 0 && (
+                  <>
+                    <span className="text-[10px] text-slate-400">·</span>
+                    <span className="text-[10px] text-slate-500">{p.longFasts} jeûne{p.longFasts > 1 ? "s" : ""} &gt; 3j</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="text-right shrink-0">
