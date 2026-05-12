@@ -172,7 +172,7 @@ export function DirigentFastClient({
       <div className="card text-sm text-slate-700">
         <p className="font-medium">Aucun jeûne des dirigeants pour Sem {week}.</p>
         <p className="mt-1 text-slate-500">
-          L'admin doit publier un jeûne des dirigeants pour cette semaine.
+          L&apos;admin doit publier un jeûne des dirigeants pour cette semaine.
         </p>
       </div>
     );
@@ -192,7 +192,7 @@ export function DirigentFastClient({
       <div className="card text-sm text-slate-700">
         <p className="font-medium">Pas encore de sujets pour Sem {week}.</p>
         <p className="mt-1 text-slate-500">
-          L'admin doit configurer les sujets du jeûne des dirigeants.
+          L&apos;admin doit configurer les sujets du jeûne des dirigeants.
         </p>
       </div>
     );
@@ -213,7 +213,7 @@ export function DirigentFastClient({
             ))}
           </select>
           <button type="button" aria-label="Semaine suivante" onClick={() => navigateWeek(1, year, week, setYear, setWeek)} className="btn-secondary">→</button>
-          <button type="button" onClick={() => { const { year: y, week: w } = getIsoWeek(); setYear(y); setWeek(w); }} className="btn-secondary text-xs">Aujourd'hui</button>
+          <button type="button" onClick={() => { const { year: y, week: w } = getIsoWeek(); setYear(y); setWeek(w); }} className="btn-secondary text-xs">Aujourd&apos;hui</button>
         </div>
         <div className="text-center">
           <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>

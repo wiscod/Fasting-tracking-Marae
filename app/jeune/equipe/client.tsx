@@ -189,7 +189,7 @@ export function TeamFastClient({
       <div className="card text-sm text-slate-700">
         <p className="font-medium">Pas encore de sujets pour Sem {week}.</p>
         <p className="mt-1 text-slate-500">
-          L'admin doit configurer les sujets de la semaine via la{" "}
+          L&apos;admin doit configurer les sujets de la semaine via la{" "}
           <Link href="/admin" className="text-brand-600 underline hover:text-brand-700">
             page admin
           </Link>
@@ -228,7 +228,7 @@ export function TeamFastClient({
             type="button"
             onClick={() => { const { year: y, week: w } = getIsoWeek(); setYear(y); setWeek(w); }}
             className="btn-secondary text-xs"
-          >Aujourd'hui</button>
+          >Aujourd&apos;hui</button>
         </div>
         <div className="text-center">
           <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>
