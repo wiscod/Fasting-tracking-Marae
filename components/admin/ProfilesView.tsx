@@ -192,7 +192,7 @@ function PersonProfileView({
         <div className="mt-3 flex flex-wrap gap-2">
           {person.totalTeamFasts > 0 && (
             <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-              {person.totalTeamFasts} jeûne{person.totalTeamFasts > 1 ? "s" : ""} d'équipe
+              {person.totalTeamFasts} jeûne{person.totalTeamFasts > 1 ? "s" : ""} d&apos;équipe
             </span>
           )}
           {person.totalPersonalFasts > 0 && (
@@ -243,7 +243,7 @@ function PersonProfileView({
       {/* Team fasts history */}
       {teamEntries.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-slate-700">Jeûnes d'équipe ({teamEntries.length})</h3>
+          <h3 className="text-sm font-semibold text-slate-700">Jeûnes d&apos;équipe ({teamEntries.length})</h3>
           {teamEntries.map((e) => (
             <EntryCard key={e.entryId} entry={e} onDelete={handleDeleteEntry} />
           ))}

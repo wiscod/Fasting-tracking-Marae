@@ -204,7 +204,7 @@ function WeekTab({
           <button type="button" aria-label="Semaine précédente" onClick={() => navigate(-1)} className="btn-secondary">←</button>
           <WeekSelector year={year} week={week} onWeekChange={setWeek} />
           <button type="button" aria-label="Semaine suivante" onClick={() => navigate(1)} className="btn-secondary">→</button>
-          <button type="button" onClick={handleToday} className="btn-secondary text-xs">Aujourd'hui</button>
+          <button type="button" onClick={handleToday} className="btn-secondary text-xs">Aujourd&apos;hui</button>
         </div>
         <div className="text-center">
           <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>

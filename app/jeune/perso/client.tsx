@@ -51,7 +51,7 @@ export function PersonalListClient() {
       {items === null ? (
         <p className="text-sm text-slate-500">Chargement…</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-slate-500">Aucun jeûne pour l'instant.</p>
+        <p className="text-sm text-slate-500">Aucun jeûne pour l&apos;instant.</p>
       ) : (
         <ul className="flex flex-col gap-3">
           {items.map((it) => {
