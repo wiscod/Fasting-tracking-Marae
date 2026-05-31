@@ -12,6 +12,7 @@ import {
   getTeamFastEntry,
   getWeeklyFastSubjects,
   saveTeamFastEntry,
+  updateWeeklyFastTitle,
 } from "@/lib/data";
 import type { Croisade, CroisadeSubject, WeeklyFast, WeeklyFastSubject } from "@/lib/types";
 
@@ -35,6 +36,7 @@ export function DirigentFastClient({
   const [croisadeSubjects, setCroisadeSubjects] = useState<CroisadeSubject[]>([]);
   const [rows, setRows] = useState<SubjectRow[]>([]);
   const [globalHours, setGlobalHours] = useState<string>("");
+  const [weekTitle, setWeekTitle] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +61,7 @@ export function DirigentFastClient({
         if (cancelled) return;
 
         setWeeklyFast(wf);
+        setWeekTitle(wf.title ?? "");
         setPredefined(subs);
         setCroisade(activeCroisade);
         setCroisadeSubjects(croisadeSubs);
@@ -155,6 +158,13 @@ export function DirigentFastClient({
         globalHours: gh != null && Number.isFinite(gh) ? gh : null,
         subjects,
       });
+
+      const trimmedWeekTitle = weekTitle.trim();
+      if (trimmedWeekTitle !== (weeklyFast.title || "")) {
+        await updateWeeklyFastTitle(weeklyFast.id, trimmedWeekTitle);
+        setWeeklyFast({ ...weeklyFast, title: trimmedWeekTitle });
+      }
+
       setStatus("saved");
       setTimeout(() => setStatus("ready"), 1500);
     } catch (e: unknown) {
@@ -215,11 +225,14 @@ export function DirigentFastClient({
           <button type="button" aria-label="Semaine suivante" onClick={() => navigateWeek(1, year, week, setYear, setWeek)} className="btn-secondary">→</button>
           <button type="button" onClick={() => { const { year: y, week: w } = getIsoWeek(); setYear(y); setWeek(w); }} className="btn-secondary text-xs">Aujourd&apos;hui</button>
         </div>
-        <div className="text-center">
+        <div className="text-center flex flex-col items-center">
           <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>
-          {weeklyFast?.title ? (
-            <p className="text-xs text-slate-500">{weeklyFast.title}</p>
-          ) : null}
+          <input
+            className="text-center text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-400 focus:outline-none transition-colors px-1 py-0.5 max-w-[200px]"
+            value={weekTitle}
+            onChange={(e) => setWeekTitle(e.target.value)}
+            placeholder="Titre de la semaine"
+          />
           {croisade && (
             <p className="text-xs font-medium text-brand-600 mt-0.5">🏹 {croisade.name}</p>
           )}

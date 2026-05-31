@@ -6,6 +6,7 @@ import {
   getOrCreateWeeklyFast,
   getWeeklyFastSubjects,
   getWeeklyParticipants,
+  updateWeeklyFastTitle,
 } from "@/lib/data";
 import type { WeeklyParticipant } from "@/lib/data";
 import type { WeeklyFast, WeeklyFastSubject } from "@/lib/types";
@@ -101,6 +102,7 @@ function WeekTab({
   const [error, setError] = useState<string | null>(null);
   const [fastType, setFastType] = useState<"equipe" | "dirigeant">("equipe");
   const [wf, setWf] = useState<WeeklyFast | null>(null);
+  const [weekTitle, setWeekTitle] = useState<string>("");
   const [labels, setLabels] = useState<string[]>(["", "", ""]);
   const [subjects, setSubjects] = useState<WeeklyFastSubject[]>([]);
   const [participants, setParticipants] = useState<WeeklyParticipant[]>([]);
@@ -125,6 +127,7 @@ function WeekTab({
         ]);
         if (cancelled) return;
         setWf(weeklyFast);
+        setWeekTitle(weeklyFast.title ?? "");
         setSubjects(subs);
         setParticipants(parts);
         const initial = Array.from(
@@ -184,6 +187,13 @@ function WeekTab({
         const data = await res.json();
         throw new Error(data.error ?? "Erreur");
       }
+
+      const trimmedWeekTitle = weekTitle.trim();
+      if (trimmedWeekTitle !== (wf.title || "")) {
+        await updateWeeklyFastTitle(wf.id, trimmedWeekTitle);
+        setWf({ ...wf, title: trimmedWeekTitle });
+      }
+
       setStatus("saved");
       setTimeout(() => setStatus("ready"), 1500);
     } catch (e: unknown) {
@@ -206,9 +216,14 @@ function WeekTab({
           <button type="button" aria-label="Semaine suivante" onClick={() => navigate(1)} className="btn-secondary">→</button>
           <button type="button" onClick={handleToday} className="btn-secondary text-xs">Aujourd&apos;hui</button>
         </div>
-        <div className="text-center">
+        <div className="text-center flex flex-col items-center gap-1 mt-1">
           <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>
-          {wf?.title && <p className="text-xs text-slate-500">{wf.title}</p>}
+          <input
+            className="text-center text-sm font-medium text-slate-700 bg-transparent border-b border-slate-200 hover:border-slate-300 focus:border-brand-400 focus:outline-none transition-colors px-1 py-0.5 max-w-[250px]"
+            value={weekTitle}
+            onChange={(e) => setWeekTitle(e.target.value)}
+            placeholder="Titre de la semaine..."
+          />
         </div>
       </div>
 
