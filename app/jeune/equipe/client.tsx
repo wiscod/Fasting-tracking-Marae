@@ -240,16 +240,18 @@ export function TeamFastClient({
             className="btn-secondary text-xs"
           >Aujourd&apos;hui</button>
         </div>
-        <div className="text-center flex flex-col items-center">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Année {year}</p>
+        <div className="text-center flex flex-col items-center gap-1.5">
+          <p className="text-xs font-bold uppercase tracking-widest text-brand-600 bg-brand-50 px-2 py-1 rounded-md">Année {year}</p>
           <input
-            className="text-center text-xs text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-slate-400 focus:outline-none transition-colors px-1 py-0.5 max-w-[200px]"
+            className="text-center text-sm font-semibold text-slate-800 bg-transparent border-b border-slate-200 hover:border-brand-300 focus:border-brand-500 focus:outline-none transition-colors px-2 py-1 max-w-[250px]"
             value={weekTitle}
             onChange={(e) => setWeekTitle(e.target.value)}
-            placeholder="Titre de la semaine"
+            placeholder="Titre de la semaine..."
           />
           {croisade && (
-            <p className="text-xs font-medium text-brand-600 mt-0.5">🏹 {croisade.name}</p>
+            <p className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full mt-1 border border-orange-100 shadow-sm flex items-center gap-1">
+              <span>🏹</span> {croisade.name}
+            </p>
           )}
         </div>
       </div>
@@ -286,17 +288,23 @@ export function TeamFastClient({
         />
       </div>
 
-      <div className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 -mx-4 mt-2 border-t border-slate-200/60 bg-white/80 px-4 py-4 backdrop-blur-xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button
           type="button"
           onClick={handleSave}
           disabled={status === "saving"}
-          className="btn-primary w-full"
+          className="btn-primary w-full py-3 text-base shadow-brand-500/20"
         >
-          {status === "saving" ? "Enregistrement…" : status === "saved" ? "✓ Enregistré" : "Enregistrer"}
+          {status === "saving" ? (
+            <span className="flex items-center gap-2"><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></span> Enregistrement...</span>
+          ) : status === "saved" ? (
+            "✓ Enregistré avec succès"
+          ) : (
+            "Enregistrer ma participation"
+          )}
         </button>
         {errorMsg ? (
-          <p className="mt-2 text-center text-xs text-red-600">{errorMsg}</p>
+          <p className="mt-3 text-center text-xs font-semibold text-red-600 bg-red-50 py-2 rounded-lg border border-red-100 animate-fade-in">{errorMsg}</p>
         ) : null}
       </div>
     </div>

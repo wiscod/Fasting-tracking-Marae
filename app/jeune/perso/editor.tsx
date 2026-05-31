@@ -359,24 +359,30 @@ export function PersonalEditor({
         </div>
       )}
 
-      <div className="sticky bottom-0 -mx-4 flex flex-col gap-2 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 -mx-4 mt-2 flex flex-col gap-2 border-t border-slate-200/60 bg-white/80 px-4 py-4 backdrop-blur-xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <button
           type="button"
           onClick={() => handleSave()}
           disabled={status === "saving"}
-          className="btn-primary w-full"
+          className="btn-primary w-full py-3 text-base shadow-brand-500/20"
         >
-          {status === "saving" ? "Enregistrement…" : status === "saved" ? "✓ Enregistré" : "Enregistrer"}
+          {status === "saving" ? (
+            <span className="flex items-center justify-center gap-2"><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></span> Enregistrement...</span>
+          ) : status === "saved" ? (
+            "✓ Enregistré avec succès"
+          ) : (
+            "Enregistrer ma participation"
+          )}
         </button>
         {mode === "edit" && canDelete && (
-          <button type="button" onClick={handleDelete} className="btn-secondary w-full text-red-600">
-            Supprimer
+          <button type="button" onClick={handleDelete} className="btn-secondary w-full text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors py-2.5">
+            Supprimer ce jeûne
           </button>
         )}
         {mode === "edit" && !canDelete && createdAt && (
-          <p className="text-center text-xs text-slate-400">Suppression impossible après 7 jours</p>
+          <p className="text-center text-xs font-medium text-slate-400 bg-slate-50 py-1.5 rounded-lg">Suppression impossible après 7 jours</p>
         )}
-        {errorMsg && <p className="text-center text-xs text-red-600">{errorMsg}</p>}
+        {errorMsg && <p className="mt-1 text-center text-xs font-semibold text-red-600 bg-red-50 py-2 rounded-lg border border-red-100 animate-fade-in">{errorMsg}</p>}
       </div>
     </div>
   );
