@@ -370,6 +370,12 @@ export async function deletePersonalFast(id: string, createdAt: string): Promise
   if (error) throw error;
 }
 
+export async function updateWeeklyFastTitle(id: string, title: string): Promise<void> {
+  const sb = getSupabaseBrowser();
+  const { error } = await sb.from("weekly_fasts").update({ title }).eq("id", id);
+  if (error) throw error;
+}
+
 export function deleteEntryAdmin(entryId: string): Promise<void> {
   return fetchAdmin<void>("deleteEntry", { entryId });
 }
@@ -589,4 +595,10 @@ export async function getMyCroisadeFasts(croisade: Croisade): Promise<CroisadeFa
     const wf = e.weekly_fast_id ? wfMap.get(e.weekly_fast_id!) : undefined;
     return { ...e, weekLabel: wf ? `Sem ${wf.week} ${wf.year}` : null };
   });
+=======
+export async function updateWeeklyFastTitle(id: string, title: string): Promise<void> {
+  const sb = getSupabase();
+  const { error } = await sb.from("weekly_fasts").update({ title }).eq("id", id);
+  if (error) throw error;
+>>>>>>> a3c9f20 (feat: rendre le titre de la semaine editable)
 }
