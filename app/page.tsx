@@ -72,7 +72,7 @@ export default async function HomePage() {
           </div>
           <span className="text-xl font-bold text-slate-800 mt-1">Jeûnes personnels</span>
           <span className="text-sm text-slate-500 leading-relaxed">
-            Liste unifiée de tes jeûnes (équipe + personnels) avec l'historique.
+            Liste unifiée de tes jeûnes (équipe + personnels) avec l&apos;historique.
           </span>
         </Link>
 

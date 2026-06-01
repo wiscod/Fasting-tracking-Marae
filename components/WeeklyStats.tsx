@@ -56,7 +56,7 @@ export function WeeklyStats({
     return (
       <div className="card text-sm text-slate-600 animate-fade-in">
         <p className="font-semibold text-slate-800">Aucune participation pour le moment.</p>
-        <p className="mt-1 text-slate-500 leading-relaxed">Les stats s'afficheront dès que des jeûneurs auront enregistré leur semaine.</p>
+        <p className="mt-1 text-slate-500 leading-relaxed">Les stats s&apos;afficheront dès que des jeûneurs auront enregistré leur semaine.</p>
       </div>
     );
   }
