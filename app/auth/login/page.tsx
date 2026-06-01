@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
 
   async function handleEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -43,6 +44,48 @@ export default function LoginPage() {
     router.refresh();
   }
 
+  async function handleDemo() {
+    setError(null);
+    setDemoLoading(true);
+    const demoEmail = "demo@fasting.marae";
+    const demoPassword = "demoPassword123!";
+    
+    let { data: signData, error } = await sb.auth.signInWithPassword({ email: demoEmail, password: demoPassword });
+    
+    // Si l'utilisateur n'existe pas, on tente de le créer
+    if (error) {
+      const { error: signUpError } = await sb.auth.signUp({ 
+        email: demoEmail, 
+        password: demoPassword,
+        options: { data: { first_name: "Invité", is_dirigeant: false } }
+      });
+      
+      if (signUpError) {
+        setError("Impossible de créer le compte de démo.");
+        setDemoLoading(false);
+        return;
+      }
+      
+      // Tentative de connexion après création
+      const { error: signInError, data: newSignData } = await sb.auth.signInWithPassword({ email: demoEmail, password: demoPassword });
+      if (signInError) {
+        setError("La création a réussi, mais la connexion auto a échoué (confirmation d'email requise ?).");
+        setDemoLoading(false);
+        return;
+      }
+      signData = newSignData;
+    }
+
+    if (signData?.user) {
+      const dk = await generateDataKey();
+      await setSessionDataKey(dk);
+    }
+    
+    setDemoLoading(false);
+    router.push("/");
+    router.refresh();
+  }
+
   async function handleGoogle() {
     setError(null);
     const { error } = await sb.auth.signInWithOAuth({
@@ -55,28 +98,46 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col gap-6 px-4 py-8">
-      <div className="flex flex-col items-center gap-3">
-        <Image src="/logo.svg" alt="Logo" width={64} height={64} priority />
+    <main className="flex flex-1 flex-col gap-6 px-4 py-8 max-w-sm mx-auto w-full">
+      <div className="flex flex-col items-center gap-3 animate-fade-in">
+        <div className="rounded-2xl bg-white p-3 shadow-sm border border-slate-100">
+          <Image src="/logo.svg" alt="Logo" width={56} height={56} priority className="drop-shadow-sm" />
+        </div>
         <div className="text-center">
-          <h1 className="text-2xl font-bold">Connexion</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-800">Connexion</h1>
           <p className="mt-1 text-sm text-slate-500">Connecte-toi pour accéder à tes jeûnes.</p>
         </div>
       </div>
 
-      <button type="button" onClick={handleGoogle} className="btn-secondary flex items-center justify-center gap-2">
-        <span>Continuer avec Google</span>
-      </button>
+      <div className="flex flex-col gap-3 animate-slide-up" style={{ animationDelay: "50ms" }}>
+        <button type="button" onClick={handleGoogle} className="btn-secondary flex items-center justify-center gap-2 py-2.5 bg-white border-slate-200 shadow-sm hover:bg-slate-50">
+          <Image src="https://www.google.com/favicon.ico" alt="Google" width={16} height={16} />
+          <span className="font-semibold text-slate-700">Continuer avec Google</span>
+        </button>
 
-      <div className="flex items-center gap-3 text-xs text-slate-400">
+        <button 
+          type="button" 
+          onClick={handleDemo} 
+          disabled={demoLoading}
+          className="btn-secondary flex items-center justify-center gap-2 py-2.5 border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 hover:border-brand-300 transition-colors"
+        >
+          {demoLoading ? (
+            <span className="flex items-center gap-2"><span className="h-4 w-4 rounded-full border-2 border-brand-500/30 border-t-brand-500 animate-spin"></span> Mode Démo...</span>
+          ) : (
+            <span className="font-bold">Essayer l&apos;application (Mode Démo)</span>
+          )}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3 text-xs text-slate-400 font-medium uppercase tracking-widest animate-fade-in" style={{ animationDelay: "100ms" }}>
         <div className="h-px flex-1 bg-slate-200" /> ou <div className="h-px flex-1 bg-slate-200" />
       </div>
 
-      <form onSubmit={handleEmail} className="flex flex-col gap-3">
+      <form onSubmit={handleEmail} className="flex flex-col gap-4 animate-slide-up" style={{ animationDelay: "150ms" }}>
         <div>
-          <label className="label">Email</label>
+          <label className="label text-slate-700">Email</label>
           <input
-            className="input mt-1"
+            className="input mt-1 shadow-sm focus:ring-2 focus:ring-brand-500/20"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -84,27 +145,34 @@ export default function LoginPage() {
           />
         </div>
         <div>
-          <label className="label">Mot de passe</label>
+          <label className="label text-slate-700">Mot de passe</label>
           <input
-            className="input mt-1"
+            className="input mt-1 shadow-sm focus:ring-2 focus:ring-brand-500/20"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
         </div>
-        {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        <button type="submit" disabled={loading} className="btn-primary">
-          {loading ? "Connexion…" : "Se connecter"}
+        
+        {error && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700 shadow-sm animate-fade-in">{error}</p>}
+        
+        <button type="submit" disabled={loading} className="btn-primary py-3 shadow-brand-500/20 mt-1">
+          {loading ? (
+            <span className="flex items-center justify-center gap-2"><span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></span> Connexion...</span>
+          ) : (
+            "Se connecter"
+          )}
         </button>
-        <Link href="/auth/forgot-password" className="text-center text-xs text-brand-600 hover:text-brand-700">
+        
+        <Link href="/auth/forgot-password" className="text-center text-sm font-medium text-brand-600 hover:text-brand-700 hover:underline underline-offset-4">
           Mot de passe oublié ?
         </Link>
       </form>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-slate-500 mt-2 animate-fade-in" style={{ animationDelay: "200ms" }}>
         Pas encore de compte ?{" "}
-        <Link href="/auth/signup" className="font-medium text-brand-600 hover:text-brand-700">
+        <Link href="/auth/signup" className="font-bold text-brand-600 hover:text-brand-700 hover:underline underline-offset-4">
           Crée-en un
         </Link>
       </p>
