@@ -16,7 +16,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [demoLoading, setDemoLoading] = useState(false);
 
   async function handleEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -44,47 +43,7 @@ export default function LoginPage() {
     router.refresh();
   }
 
-  async function handleDemo() {
-    setError(null);
-    setDemoLoading(true);
-    const demoEmail = "demo@fasting.marae";
-    const demoPassword = "demoPassword123!";
-    
-    let { data: signData, error } = await sb.auth.signInWithPassword({ email: demoEmail, password: demoPassword });
-    
-    // Si l'utilisateur n'existe pas, on tente de le créer
-    if (error) {
-      const { error: signUpError } = await sb.auth.signUp({ 
-        email: demoEmail, 
-        password: demoPassword,
-        options: { data: { first_name: "Invité", is_dirigeant: false } }
-      });
-      
-      if (signUpError) {
-        setError("Impossible de créer le compte de démo.");
-        setDemoLoading(false);
-        return;
-      }
-      
-      // Tentative de connexion après création
-      const { error: signInError, data: newSignData } = await sb.auth.signInWithPassword({ email: demoEmail, password: demoPassword });
-      if (signInError) {
-        setError("La création a réussi, mais la connexion auto a échoué (confirmation d'email requise ?).");
-        setDemoLoading(false);
-        return;
-      }
-      signData = newSignData;
-    }
 
-    if (signData?.user) {
-      const dk = await generateDataKey();
-      await setSessionDataKey(dk);
-    }
-    
-    setDemoLoading(false);
-    router.push("/");
-    router.refresh();
-  }
 
   async function handleGoogle() {
     setError(null);
@@ -113,19 +72,6 @@ export default function LoginPage() {
         <button type="button" onClick={handleGoogle} className="btn-secondary flex items-center justify-center gap-2 py-2.5 bg-white border-slate-200 shadow-sm hover:bg-slate-50">
           <Image src="https://www.google.com/favicon.ico" alt="Google" width={16} height={16} />
           <span className="font-semibold text-slate-700">Continuer avec Google</span>
-        </button>
-
-        <button 
-          type="button" 
-          onClick={handleDemo} 
-          disabled={demoLoading}
-          className="btn-secondary flex items-center justify-center gap-2 py-2.5 border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100 hover:border-brand-300 transition-colors"
-        >
-          {demoLoading ? (
-            <span className="flex items-center gap-2"><span className="h-4 w-4 rounded-full border-2 border-brand-500/30 border-t-brand-500 animate-spin"></span> Mode Démo...</span>
-          ) : (
-            <span className="font-bold">Essayer l&apos;application (Mode Démo)</span>
-          )}
         </button>
       </div>
 
